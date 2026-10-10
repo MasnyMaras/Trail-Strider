@@ -26,7 +26,8 @@ services:
       PGDATABASE: ${POSTGRES_DB}
     volumes:
       - ./data:/data:ro                  # pliki PBF widoczne w kontenerze jako /data
-      - ./osm2pgsql:/config:ro           # konfiguracje Lua widoczne jako /config
+      #- ./osm2pgsql:/config:ro           # konfiguracje Lua widoczne jako /config (stara struktura, do usuniecia)
+      - ./db/osm2pgsql:/config:ro        # konfiguracje Lua widoczne jako /config (tylko odczyt)
 
 volumes:
   pgdata:

@@ -318,10 +318,11 @@ ssh -T git@github.com
 ```bash
 cd ~
 git clone git@github.com:MasnyMaras/Trail-Strider.git
-cd ~/Trail-Strider/db
+cd ~/Trail-Strider
 ```
-⚠️ Środowisko bazy danych znajduje się w folderze `db/`. Nie edytuj plików poza `db/` (np. `frontend/`).
-**Od tego miejsca wszystkie komendy wykonujesz w `~/Trail-Strider/db`.**
+⚠️ Środowisko bazy danych: `compose.yaml` i `.env` są w głównym folderze, pliki bazy w `db/`.
+Nie edytuj plików frontendu (`frontend/`).
+**Od tego miejsca wszystkie komendy wykonujesz w `~/Trail-Strider`.**
 
 **Sprawdź po:**
 ```bash
@@ -334,8 +335,8 @@ ls -a
 | komenda | musi pokazać |
 |---|---|
 | `git branch` | `* main` |
-| `pwd` | `/home/<twoja-nazwa>/Trail-Strider/db` |
-| `ls -a` | m.in. `.env.example`, `.gitattributes`, `.gitignore`, `SETUP.md`, `compose.yaml` |
+| `pwd` | `/home/<twoja-nazwa>/Trail-Strider` |
+| `ls -a` | m.in. `.env.example`, `compose.yaml`, `db`, `docs`, `frontend` |
 
 
 ---
@@ -365,7 +366,7 @@ git check-ignore -v .env
 |---|---|
 | `docker compose config --quiet ...` | `skladnia OK` |
 | `docker compose config \| grep ...` | `name: trail-strider`, `host_ip: 127.0.0.1`, `name: trail-strider_default`, `name: trail-strider_pgdata` |
-| `git check-ignore -v .env` | `db/.gitignore:2:.env	.env` – plik `.env` jest ignorowany przez Gita (nie trafi do repozytorium) |
+| `git check-ignore -v .env` | `.gitignore:4:*.env	.env` – plik `.env` jest ignorowany przez Gita (nie trafi do repozytorium) |
 
 
 
@@ -402,7 +403,7 @@ git check-ignore -v data/malopolskie-261001.osm.pbf
 |---|---|
 | `md5sum -c ...` | `malopolskie-261001.osm.pbf: OK` (plik kompletny i nieuszkodzony) |
 | `ls -l data` | `malopolskie-261001.osm.pbf` o rozmiarze **202209422** oraz `.md5` o rozmiarze **61** |
-| `git check-ignore -v ...` | `db/.gitignore:5:data/	data/malopolskie-261001.osm.pbf` (dane nie trafią do repozytorium) |
+| `git check-ignore -v ...` | `.gitignore:60:/data/	data/malopolskie-261001.osm.pbf` (dane nie trafią do repozytorium) |
 
 ❌ `md5sum` pokazuje `FAILED` – usuń pliki z `data/` i pobierz ponownie.
 
@@ -450,7 +451,7 @@ Jeśli w logach nie ma jeszcze `ready to accept connections` – odczekaj kilka 
 | `SELECT version();` | zaczyna się od `PostgreSQL 18.6` |
 | `SELECT postgis_lib_version();` | `3.6.4` |
 
-ℹ️ Po restarcie komputera baza nie startuje sama – przed pracą: `docker compose up -d` (w `~/Trail-Strider/db`).
+ℹ️ Po restarcie komputera baza nie startuje sama – przed pracą: `docker compose up -d` (w `~/Trail-Strider`).
 
 
 ### 9b. Podgląd bazy (przed importem)
@@ -498,7 +499,7 @@ docker compose exec db psql -U osm -d osm -P pager=off -c "\dt public.*"
 time docker compose run --rm osm2pgsql -O flex -S /config/generic.lua /data/malopolskie-261001.osm.pbf
 ```
 - `-O flex -S /config/generic.lua` – tryb importu i plik konfiguracji (`db/osm2pgsql/generic.lua`),
-- `/data/...` – plik danych (`db/data/...`); ścieżki są widziane z wnętrza kontenera,
+- `/data/...` – plik danych (`data/...` w głównym folderze); ścieżki są widziane z wnętrza kontenera,
 - za pierwszym razem Docker pobierze obraz osm2pgsql (ok. 280 MB),
 - import trwa ok. 1,5 minuty.
 
@@ -552,28 +553,28 @@ Paczki Pythona instalujemy w osobnym środowisku (`.venv`) w dokładnych wersjac
 
 **Wykonaj:**
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r scripts/requirements.txt
+python3 -m venv db/.venv
+source db/.venv/bin/activate
+pip install -r db/scripts/requirements.txt
 ```
-- `python3 -m venv .venv` – tworzy środowisko w `db/.venv` (poza repozytorium, jest w `.gitignore`),
-- `source .venv/bin/activate` – włącza środowisko; znak zachęty zaczyna się od `(.venv)`,
+- `python3 -m venv db/.venv` – tworzy środowisko w `db/.venv` (poza repozytorium, jest w `.gitignore`),
+- `source db/.venv/bin/activate` – włącza środowisko; znak zachęty zaczyna się od `(.venv)`,
 - `pip install -r ...` – instaluje 22 paczki w dokładnych wersjach.
 
 ⚠️ Aktywacja działa tylko w tym oknie terminala. **W każdym nowym terminalu** przed uruchomieniem skryptów:
-`cd ~/Trail-Strider/db && source .venv/bin/activate`. Wyjście ze środowiska: `deactivate`.
+`cd ~/Trail-Strider && source db/.venv/bin/activate`. Wyjście ze środowiska: `deactivate`.
 
 **Sprawdź po:**
 ```bash
-diff <(pip freeze --path .venv/lib/python3.12/site-packages) scripts/requirements.txt && echo "IDENTYCZNE"
-git check-ignore -v .venv
+diff <(pip freeze --path db/.venv/lib/python3.12/site-packages) db/scripts/requirements.txt && echo "IDENTYCZNE"
+git check-ignore -v db/.venv
 ```
 
 **Wymagane:**
 | komenda | musi pokazać |
 |---|---|
 | `diff ...` | `IDENTYCZNE` (zainstalowane wersje = wersje z `requirements.txt`) |
-| `git check-ignore -v .venv` | `db/.gitignore:8:.venv/	.venv` |
+| `git check-ignore -v db/.venv` | `.gitignore:39:.venv/	db/.venv` |
 
 ❌ Jeśli `diff` wypisuje różnice (linie z `<` / `>`) – zgłoś.
 
@@ -594,14 +595,13 @@ docker compose ps
 **Wymagane:**
 | komenda | musi pokazać |
 |---|---|
-| znak zachęty | zaczyna się od `(.venv)` (jeśli nie: `source .venv/bin/activate`) |
-| `pwd` | `/home/<twoja-nazwa>/Trail-Strider/db` |
-| `docker compose ps` | `trail-strider-db-1` ze statusem `Up` |
+| znak zachęty | zaczyna się od `(.venv)` (jeśli nie: `source db/.venv/bin/activate`) |
+| `pwd` | `/home/<twoja-nazwa>/Trail-Strider` |
 
 **Wykonaj:**
 ```bash
-python scripts/krakow_map.py
-python scripts/malopolskie_roads.py
+python db/scripts/krakow_map.py
+python db/scripts/malopolskie_roads.py
 ```
 
 **Wymagane:**
@@ -624,8 +624,8 @@ xdg-open output/malopolskie_drogi.png
 
 ### Codzienna praca (po restarcie komputera)
 ```bash
-cd ~/Trail-Strider/db
-docker compose up -d             # uruchom bazę (więcej o pracy z dockerem w README_ADDITIONAL.md - moj plik stary, nie trzeba go doglebie analizowac ale mozna znalezc wiecej info o pracy z dockerem, bazą)
-source .venv/bin/activate        # włącz środowisko Pythona
+cd ~/Trail-Strider
+docker compose up -d             # uruchom bazę
+source db/.venv/bin/activate     # włącz środowisko Pythona
 ```
 Koniec pracy: `docker compose stop` (dane zostają w bazie).

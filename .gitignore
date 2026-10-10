@@ -55,3 +55,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Dane OSM (PBF, md5) - pobierane, nie trzymane w repo
+/data/
+
+# Wygenerowane pliki (np. mapy PNG ze skryptów)
+/output/
+
