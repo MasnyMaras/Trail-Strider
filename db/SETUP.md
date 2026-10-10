@@ -1,5 +1,4 @@
-# SETUP – środowisko bazy danych OSM (Trail-Strider, branch `dev-db`)
-
+# SETUP – środowisko bazy danych OSM (Trail-Strider, folder `db/`)
 Instrukcja prowadzi od czystego Ubuntu do działającej bazy PostgreSQL + PostGIS
 z danymi OpenStreetMap i skryptów generujących przykładowe mapy (PNG).
 
@@ -315,19 +314,13 @@ ssh -T git@github.com
 
 ❌ Jeśli `ssh -T` daje `Permission denied (publickey)` – najpierw skonfiguruj dostęp SSH do GitHuba (poza tą instrukcją).
 
-***Wykonaj:**
+**Wykonaj:**
 ```bash
 cd ~
 git clone git@github.com:MasnyMaras/Trail-Strider.git
-cd ~/Trail-Strider
-git switch dev-db
-cd db
+cd ~/Trail-Strider/db
 ```
-- `git clone` – pobiera całe repozytorium (domyślnie ustawia branch `main`).
-- `git switch dev-db` – przełącza na branch środowiska bazy danych.
-
-⚠️ **Pracujemy wyłącznie na branchu `dev-db`, w folderze `db/`.**
-Nie przełączaj się na `main` i nie edytuj plików poza `db/`.
+⚠️ Środowisko bazy danych znajduje się w folderze `db/`. Nie edytuj plików poza `db/` (np. `frontend/`).
 **Od tego miejsca wszystkie komendy wykonujesz w `~/Trail-Strider/db`.**
 
 **Sprawdź po:**
@@ -340,9 +333,12 @@ ls -a
 **Wymagane:**
 | komenda | musi pokazać |
 |---|---|
-| `git branch` | `* dev-db` oraz `main` (gwiazdka = aktualny branch) |
+| `git branch` | `* main` |
 | `pwd` | `/home/<twoja-nazwa>/Trail-Strider/db` |
 | `ls -a` | m.in. `.env.example`, `.gitattributes`, `.gitignore`, `SETUP.md`, `compose.yaml` |
+
+
+---
 
 ## Krok 7. Plik `.env` (hasło do bazy)
 
