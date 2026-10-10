@@ -1,0 +1,32 @@
+name: trail-strider                      # nazwa projektu - prefiks kontenerów i wolumenów
+
+services:
+  db:
+    #image: postgis/postgis:18-3.6        # stała wersja, nie "latest" - wszyscy mają to samo 
+    image: postgis/postgis:18-3.6@sha256:60f6ad1d21ea86a67d47780b9a0d1e1d200500f62b19293fa834d0dea80b8677   # przypięty skrót = dokładnie ta kompilacja
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}    # wartości z pliku .env
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:5432:5432"            # tylko z tego komputera, nie z sieci
+    volumes:
+      - pgdata:/var/lib/postgresql       # dane bazy przeżyją usunięcie kontenera
+
+  osm2pgsql:
+    #image: iboates/osm2pgsql:2.3.1       # przypięta wersja
+    image: iboates/osm2pgsql:2.3.1@sha256:6548a1e2492e08fa0d5ce987d382ad57c4b21c8a94ff00017c6109770a061b79   # przypięty skrót = dokładnie ta kompilacja
+    profiles: ["tools"]                  # NIE startuje przy "docker compose up" - tylko na żądanie
+    depends_on:
+      - db
+    environment:
+      PGHOST: db                         # adres bazy = nazwa usługi w sieci projektu
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+    volumes:
+      - ./data:/data:ro                  # pliki PBF widoczne w kontenerze jako /data
+      - ./osm2pgsql:/config:ro           # konfiguracje Lua widoczne jako /config
+
+volumes:
+  pgdata:
