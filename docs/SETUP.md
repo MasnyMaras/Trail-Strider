@@ -629,3 +629,78 @@ docker compose up -d             # uruchom bazę
 source db/.venv/bin/activate     # włącz środowisko Pythona
 ```
 Koniec pracy: `docker compose stop` (dane zostają w bazie).
+
+
+---
+
+# CZĘŚĆ 3. Dane dodatkowe
+
+## Krok 13. Noclegi z Lasów Państwowych (schemat `bdl`)
+
+Dwa skrypty pobierają dane noclegowe z Banku Danych o Lasach (usługa WFS mapy turystycznej)
+i ładują je do bazy, do osobnego schematu `bdl` – obok danych OSM, nie razem z nimi.
+
+| tabela | co zawiera | geometria |
+|---|---|---|
+| `bdl.zanocuj_w_lesie` | obszary programu „Zanocuj w lesie” | poligony |
+| `bdl.noclegi_powierzchniowe` | miejsca biwakowania, pola biwakowe | punkty |
+| `bdl.noclegi_kubaturowe` | pokoje gościnne, kwatery myśliwskie, schroniska leśne | punkty |
+
+Każda tabela ma kolumny `id`, `props` (wszystkie atrybuty z BDL jako jsonb, np. `nzw_ob` – nazwa,
+`tur_obj_desc` – rodzaj) i `geom` (EPSG:3857, tak jak tabele OSM). Dane obejmują **całą Polskę**.
+
+⚠️ Serwer Lasów nie udostępnia wersji z datą (inaczej niż Geofabrik). Liczby poniżej to stan
+na **10.10.2026** – u Ciebie mogą być inne, jeśli Lasy zmieniły dane. Skrypt sam porównuje liczbę
+pobranych obiektów z liczbą na serwerze, więc liczy się `OK` na końcu każdej linii.
+
+**Sprawdź przed:**
+```bash
+pwd
+docker compose ps
+```
+
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| znak zachęty | zaczyna się od `(.venv)` (jeśli nie: `source db/.venv/bin/activate`) |
+| `pwd` | `/home/<twoja-nazwa>/Trail-Strider` |
+| `docker compose ps` | `trail-strider-db-1` ze statusem `Up` |
+
+**Wykonaj:**
+```bash
+python db/scripts/bdl_download.py
+python db/scripts/bdl_load.py
+```
+- `bdl_download.py` – pobiera trzy warstwy do `data/bdl/` (GeoJSON, razem ok. 21 MB) i zapisuje
+  źródło oraz czas pobrania w `data/bdl/pobranie.json`,
+- `bdl_load.py` – tworzy schemat `bdl` i trzy tabele. Każde uruchomienie tworzy tabele od nowa;
+  całość jest jedną transakcją (przy błędzie baza zostaje bez zmian).
+
+**Wymagane:**
+| skrypt | musi pokazać |
+|---|---|
+| `bdl_download.py` | `zanocuj_w_lesie 1,237 / 1,237 na serwerze ... OK`, `noclegi_powierzchniowe 325 / 325 ... OK`, `noclegi_kubaturowe 192 / 192 ... OK` |
+| `bdl_load.py` | `bdl.zanocuj_w_lesie 1,237 wierszy bez geometrii 0 naprawione 887`, `bdl.noclegi_powierzchniowe 325 wierszy`, `bdl.noclegi_kubaturowe 192 wierszy`, `Załadowano do schematu bdl` |
+
+`naprawione 887` jest poprawne: serwer zapisuje część obszarów w sposób, którego PostGIS nie uznaje
+za poprawną geometrię. Skrypt je naprawia (`ST_MakeValid`); kształty i powierzchnie się nie zmieniają.
+
+❌ `NIEZGODNE` albo `BŁĄD` w wyniku `bdl_download.py` – uruchom skrypt ponownie; jeśli się powtarza, zgłoś.
+
+**Sprawdź po:**
+```bash
+docker compose exec db psql -U osm -d osm -P pager=off -c "\dt bdl.*"
+docker compose exec db psql -U osm -d osm -P pager=off -c "SELECT count(*) AS wszystkie, count(*) FILTER (WHERE NOT ST_IsValid(geom)) AS bledne, round(sum(ST_Area(ST_Transform(geom, 2180))) / 1e4) AS ha FROM bdl.zanocuj_w_lesie;"
+git status --short
+```
+
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| `\dt bdl.*` | 3 tabele: `noclegi_kubaturowe`, `noclegi_powierzchniowe`, `zanocuj_w_lesie` |
+| `SELECT count(*) ...` | `wszystkie 1237`, `bledne 0`, `ha 618726` (stan na 10.10.2026) |
+| `git status --short` | pusto (pliki w `data/` nie trafiają do repozytorium) |
+
+ℹ️ Źródło danych: Bank Danych o Lasach, Lasy Państwowe. Źródło i data pobrania są zapisane
+w komentarzu każdej tabeli (`\dt+ bdl.*`). Przy publikacji wyników podajemy źródło.
+Odległości liczymy po przeliczeniu do układu metrycznego (`ST_Transform(geom, 2180)`), nie w EPSG:3857.
