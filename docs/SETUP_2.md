@@ -403,7 +403,7 @@ git check-ignore -v data/malopolskie-261001.osm.pbf
 |---|---|
 | `md5sum -c ...` | `malopolskie-261001.osm.pbf: OK` (plik kompletny i nieuszkodzony) |
 | `ls -l data` | `malopolskie-261001.osm.pbf` o rozmiarze **202209422** oraz `.md5` o rozmiarze **61** |
-| `git check-ignore -v ...` | `.gitignore:60:/data/	data/malopolskie-261001.osm.pbf` (dane nie trafią do repozytorium) |
+| `git check-ignore -v ...` | `.gitignore:59:/data/	data/malopolskie-261001.osm.pbf` (dane nie trafią do repozytorium) |
 
 ❌ `md5sum` pokazuje `FAILED` – usuń pliki z `data/` i pobierz ponownie.
 
