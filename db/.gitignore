@@ -1,0 +1,12 @@
+# Hasło i lokalna konfiguracja - nigdy w repo
+.env
+
+# Dane OSM (PBF, md5) - pobierane, nie trzymane w repo
+data/
+
+# Środowisko Pythona i cache
+.venv/
+__pycache__/
+
+# Wygenerowane obrazy
+output/
