@@ -55,3 +55,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+*.osm.pbf
+*.pbf
+*.rd5
+*.tif
+*.tiff
