@@ -28,6 +28,22 @@ services:
       - ./data:/data:ro                  # pliki PBF widoczne w kontenerze jako /data
       #- ./osm2pgsql:/config:ro           # konfiguracje Lua widoczne jako /config (stara struktura, do usuniecia)
       - ./db/osm2pgsql:/config:ro        # konfiguracje Lua widoczne jako /config (tylko odczyt)
+  brouter:
+    image: ghcr.io/abrensch/brouter:nightly # brouter ready image from git
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:17777:17777"             # default http port for BRouter, localhost not web
+    volumes:
+      - type: bind
+        source: ./routing/segments4
+        target: /segments4
+        read_only: true
+    environment:
+      MAXTHREADS: "2"
+      JAVA_OPTS: "-Xmx128M -Xms128M -Xmn8M -DmaxRunningTime=10 -DuseRFCMimeType=false"
+    # brouter config parameters based on: 
+    # https://github.com/abrensch/brouter/blob/master/README.md
+    # https://zod.github.io/brouter/developers/docker_guide.html
 
 volumes:
   pgdata:

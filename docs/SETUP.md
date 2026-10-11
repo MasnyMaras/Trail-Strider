@@ -430,7 +430,7 @@ docker volume ls | grep trail-strider
 
 **Wykonaj:**
 ```bash
-docker compose up -d
+docker compose up -d db
 ```
 Za pierwszym razem Docker pobierze obraz bazy (ok. 240 MB). `-d` = baza działa w tle.
 
@@ -451,7 +451,7 @@ Jeśli w logach nie ma jeszcze `ready to accept connections` – odczekaj kilka 
 | `SELECT version();` | zaczyna się od `PostgreSQL 18.6` |
 | `SELECT postgis_lib_version();` | `3.6.4` |
 
-ℹ️ Po restarcie komputera baza nie startuje sama – przed pracą: `docker compose up -d` (w `~/Trail-Strider`).
+ℹ️ Po restarcie komputera baza nie startuje sama – przed pracą: `docker compose up -d db` (w `~/Trail-Strider`).
 
 
 ### 9b. Podgląd bazy (przed importem)
@@ -625,10 +625,10 @@ xdg-open output/malopolskie_drogi.png
 ### Codzienna praca (po restarcie komputera)
 ```bash
 cd ~/Trail-Strider
-docker compose up -d             # uruchom bazę
+docker compose up -d db          # uruchom bazę
 source db/.venv/bin/activate     # włącz środowisko Pythona
 ```
-Koniec pracy: `docker compose stop` (dane zostają w bazie).
+Koniec pracy: `docker compose stop db` (dane zostają w bazie).
 
 
 ---
