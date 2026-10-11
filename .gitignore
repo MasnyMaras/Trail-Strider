@@ -58,6 +58,7 @@ pnpm-debug.log*
 
 /data/
 /output/
+/routing/output/
 
 *.osm.pbf
 *.pbf
