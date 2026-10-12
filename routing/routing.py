@@ -1,29 +1,23 @@
 import os
 import requests
-import time
 import gpxpy
 import gpxpy.gpx
-from pathlib import Path
-from dotenv import load_dotenv
-from sqlalchemy import URL, create_engine
 
 BROUTER_URL = os.getenv("BROUTER_URL", "http://localhost:17777/brouter")
 
-def connect_db():
-    load_dotenv()
+def brouter_response(coordinates):
+    """
+    Uses brouter to designate a route based on given coordinates.
 
-    engine = create_engine(URL.create(
-        "postgresql+psycopg",
-        username=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"],
-        host="127.0.0.1",
-        port=5432,
-        database=os.environ["POSTGRES_DB"],
-    ))
+    Args:
+        coordinates (list, array_like): list of [lon, lat] points in DD (Decimal Degrees) form.
+    Returns:
+        dict: GeoJSON with the generated path.
+    """
+    points = "|".join(
+        f"{lon},{lat}" for lon, lat in coordinates
+    )
 
-    return engine
-
-def brouter_response(points):
     response = requests.get(
         BROUTER_URL,
         params={
@@ -37,10 +31,15 @@ def brouter_response(points):
     response.raise_for_status()
     return response.json()
 
-def create_gpx(route, output_file):
-    gpx = gpxpy.gpx.GPX()
-    gpx.creator = "Trail-Strider"
+def create_gpx(route):
+    """
+    Converts GeoJSON route to GPX format. Does not save it as a file, but returns it as a dictionary instead.
 
+    Args:
+        route (dict): GeoJSON with the generated path.
+    Returns:
+        dict: generated path in GPX format.
+    """
     features = route.get("features", [])
     if not features:
         raise ValueError("Invalid brouter response.")
@@ -52,6 +51,9 @@ def create_gpx(route, output_file):
     coordinates = geometry.get("coordinates", [])
     if not coordinates:
         raise ValueError("No coordinates found.")
+
+    gpx = gpxpy.gpx.GPX()
+    gpx.creator = "Trail-Strider"
 
     track = gpxpy.gpx.GPXTrack()
     gpx.tracks.append(track)
@@ -70,32 +72,50 @@ def create_gpx(route, output_file):
         )
         segment.points.append(point)
 
-    path = Path(output_file)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(gpx.to_xml(), encoding="utf-8")
+    return gpx.to_xml()
 
-    return path
+def path(coordinates, flag="m"):
+    """
+    Generates path in selected mode.
 
-def main():
-    # placeholder for real data: pairs of coordinates lon, lat - points selected by user in manual mode:
-    coordinates = [
-        (19.935833, 49.307500),
-        (19.934084, 49.251005),
-        (19.980521, 49.269497),
-        (19.949600, 49.299200),
-        (19.981650, 49.232370),
-        (19.932204, 49.236528),
-        (19.949600, 49.299200),
-    ]
+    Args:
+        coordinates (list, array_like): list of [lon, lat] points in DD (Decimal Degrees) form.
+        flag (str): "m" - manual mode, "a" - automatic mode.
+    Returns:
+        dict:
+            {
+                "json": GeoJSON including generated path.
+                "gpx": generated path in GPX format.
+            }
+    Raises:
+        ValueError: invalid arguments,
+        requests.RequestException: brouter communication error.
+    """
+    if flag is None:
+        flag = "m"
 
-    points = "|".join(
-        f"{lon},{lat}" for lon, lat in coordinates
-    )
-    start = time.perf_counter()
-    route = brouter_response(points)
-    t = time.perf_counter() - start
-    print(f"Brouter took {t:.2f} seconds to generate manual response.")
-    create_gpx(route, "output/manual.gpx")
+    if not isinstance(flag,str) or flag not in ("m", "a"):
+        raise ValueError("Unknown flag. Accepted values: 'm', 'a'.")
+    elif flag == "m":
+        if not isinstance(coordinates, (list, tuple)):
+            raise ValueError("Coordinates must be a list of points [lon, lat].")
 
-if __name__ == "__main__":
-    main()
+        if len(coordinates) < 2:
+            raise ValueError("Route must have at least 2 points.")
+
+        for point in coordinates:
+            if not isinstance(point, (list, tuple)) or len (point) !=2:
+                raise ValueError("Each point must be [lon,lat].")
+
+        route = brouter_response(coordinates)
+        gpx   = create_gpx(route)
+
+        return {
+            "json": route,
+            "gpx":  gpx,
+        }
+    elif flag == "a":
+        # TODO: implement automatic routing
+        raise NotImplementedError("Automatic mode not yet implemented.")
+    else:
+        raise ValueError("Unknown flag. Accepted values: 'm', 'a'.")
