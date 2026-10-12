@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button"
+import Header from "@/components/ui/header"
 
 export function App() {
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center ">
-                <p className="text-sm">
+        <div className="flex min-h-screen flex-col bg-slate-50">
+            <Header />
+            <p className="text-sm">
                     Tailwind CSS & shadcn/ui działają
                 </p>
                 <Button variant="default" onClick={() => alert("Dziala")}>
