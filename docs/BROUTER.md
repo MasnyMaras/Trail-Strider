@@ -9,8 +9,8 @@ cd ~/Trail-Strider
 Create routing directory & get `.rd5` files e.g. with tile corner in 45°N 15°E (in Lesser Poland Voivodeship). 
 Check if rd5 files got downloaded:
 ```bash
-mkdir -p routing/segmens4
-wget -O routing/segments4/E20_N50.rd5 \https://brouter.de/brouter/segments4/E15_N45.rd5
+mkdir -p routing/segments4
+wget -O routing/segments4/E20_N50.rd5 \https://brouter.de/brouter/segments4/E20_N50.rd5
 ```
 BRouter uses `.rd5` files containing routing data for geographic areas measuring 5° × 5°. The tile name identifies the southwest corner of the area it covers.
 
