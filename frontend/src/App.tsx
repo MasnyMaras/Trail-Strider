@@ -1,16 +1,14 @@
-import { Button } from "@/components/ui/button"
+//import { Button } from "@/components/ui/button"
 import Header from "@/components/ui/header"
+import MapView from "@/components/map/MapView"
 
 export function App() {
     return (
-        <div className="flex min-h-screen flex-col bg-slate-50">
+        <div className="flex min-h-screen flex-col overflow-hidden bg-slate-50">
             <Header />
-            <p className="text-sm">
-                    Tailwind CSS & shadcn/ui działają
-                </p>
-                <Button variant="default" onClick={() => alert("Dziala")}>
-                    test
-                </Button>
+            <main className="relative flex-1 w-full h-full">
+                <MapView />
+            </main>
         </div>
     )
 }
