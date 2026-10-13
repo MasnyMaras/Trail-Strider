@@ -27,7 +27,7 @@ export interface ScaleOptions {
  */
 const DEFAULT_OPTIONS: Required<ScaleOptions> = {
     maxWidth: 180,
-    unit: "imperial",
+    unit: "metric",
 }
 
 /** Conversion constant: 1 international mile in meters. */
