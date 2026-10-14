@@ -5,8 +5,10 @@ import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import { ScaleControl } from "./Scale"
 
 setWorkerUrl(maplibreWorkerUrl)
-
-export function MapView() {
+interface MapViewProps {
+    isSidebarOpen: boolean;
+}
+export function MapView({ isSidebarOpen }: MapViewProps) {
     const mapContainerRef = useRef<HTMLDivElement>(null)
     const mapRef = useRef<Map | null>(null)
 
@@ -30,6 +32,10 @@ export function MapView() {
 
         map.on("load", () => {
             map.resize()
+            const topRightControls = document.querySelector('.maplibregl-ctrl-top-right');
+            if (topRightControls) {
+                topRightControls.classList.add('mt-18', 'mr-2');
+            }
         })
 
         mapRef.current = map
@@ -39,6 +45,33 @@ export function MapView() {
             mapRef.current = null
         }
     }, [])
+    useEffect(() => {
+        const rightControls = document.querySelectorAll('.maplibregl-ctrl-top-right');
+
+        const updateTransform = () => {
+            rightControls.forEach((ctrl) => {
+                const element = ctrl as HTMLElement;
+                element.style.transition = 'transform 0.3s ease-in-out';
+
+                if (isSidebarOpen) {
+                    if (window.innerWidth >= 1024) {
+                        element.style.transform = 'translateX(-500px)';
+                    } else if (window.innerWidth >= 768) {
+                        element.style.transform = 'translateX(-340px)';
+                    } else {
+                        element.style.transform = 'translateX(-260px)';
+                    }
+                } else {
+                    element.style.transform = 'translateX(0)';
+                }
+            });
+        };
+
+        updateTransform();
+        window.addEventListener('resize', updateTransform);
+
+        return () => window.removeEventListener('resize', updateTransform);
+    }, [isSidebarOpen])
 
     return (
         <div className="absolute inset-0 h-full w-full">
