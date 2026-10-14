@@ -1,11 +1,58 @@
-import { ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { useState} from "react";
+import { ChevronLeft, ChevronRight, Download, Plus, Menu, X } from "lucide-react";
 
 interface SidebarProps {
     isOpen: boolean;
     onToggle: () => void;
 }
-
+interface RoutePoint {
+    id: string;
+    value: string;
+}
 export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
+    const [points, setPoints] = useState<RoutePoint[]>([
+        { id: "start-initial", value: "" },
+        { id: "end-initial", value: "" }
+    ]);
+
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+    const addStop = (insertIndex: number) => {
+        const newPoints = [...points];
+        newPoints.splice(insertIndex, 0, { id: `point-${Date.now()}`, value: "" });
+        setPoints(newPoints);
+    };
+
+    const removeStop = (idToRemove: string) => {
+        setPoints(points.filter(p => p.id !== idToRemove));
+    };
+
+    const updatePointValue = (id: string, newValue: string) => {
+        setPoints(points.map(p => p.id === id ? { ...p, value: newValue } : p));
+    };
+
+    const handleDragStart = (e: React.DragEvent, index: number) => {
+        setDraggedIndex(index);
+        e.dataTransfer.effectAllowed = "move";
+    };
+
+    const handleDragEnter = (_e: React.DragEvent, targetIndex: number) => {
+        if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+        setPoints((prev) => {
+            const newPoints = [...prev];
+            const [moved] = newPoints.splice(draggedIndex, 1);
+            newPoints.splice(targetIndex, 0, moved);
+            return newPoints;
+        });
+
+        setDraggedIndex(targetIndex);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedIndex(null);
+    };
+
     const handlePlaceholderClick = () => {
         console.log("[Sidebar] Action button clicked");
         alert("Zapisano ustawienia");
@@ -19,26 +66,115 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
         >
             <button
                 onClick={onToggle}
-                className="absolute -left-10 top-1/2 flex h-16 w-10 -translate-y-1/2 items-center justify-center rounded-l-xl border-y border-l border-white/50 bg-white/60 text-slate-700 shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-md transition-all hover:bg-white hover:text-green-600 focus:bg-white focus:outline-none"
+                className="absolute -left-10 top-1/2 flex h-16 w-10 -translate-y-1/2 items-center justify-center rounded-l-xl border-y border-l border-white/50 bg-white/60 text-slate-700 shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-md transition-all hover:bg-white hover:text-green-700 focus:bg-white focus:outline-none"
                 aria-label={isOpen ? "Zwiń panel" : "Rozwiń panel"}
             >
                 {isOpen ? <ChevronRight size={24} /> : <ChevronLeft size={24} />}
             </button>
 
-            <div className="m-2 flex flex-1 flex-col overflow-hidden rounded-xl bg-white p-3 shadow-inner md:p-4">
-                <h2 className="mb-3 text-base font-bold text-slate-800 md:mb-4 md:text-lg">
-                    Ustawienia trasy
+            <div className="flex flex-1 flex-col overflow-hidden p-4 md:p-6">
+                <h2 className="mb-6 text-center text-2xl font-['Pacifico'] tracking-wide text-green-700 drop-shadow-sm md:text-3xl">
+                    Planowanie trasy
                 </h2>
 
-                <p className="flex-1 text-xs text-slate-500 md:text-sm">
-                    Tutaj w przyszłości pojawią się opcje wyszukiwania i filtry...
-                </p>
+                <div
+                    className="flex flex-1 flex-col overflow-y-auto pb-4 pr-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-green-700 [&::-webkit-scrollbar-thumb]:rounded-full [scrollbar-width:thin] [scrollbar-color:theme(colors.green.700)_transparent]"
+                    onWheel={(e) => e.stopPropagation()}
+                    onDragOver={(e) => e.preventDefault()} /* <--- DODANO TĘ LINIJKĘ */
+                >
+                    {points.map((point, index) => {
+                        const isFirst = index === 0;
+                        const isLast = index === points.length - 1;
+                        const canDelete = !isFirst && !isLast;
+                        const labelText = isFirst ? "Początek trasy" : isLast ? "Koniec trasy" : `Przystanek ${index}`;
+                        const isDragged = draggedIndex === index;
+
+                        return (
+                            <div key={point.id} className="flex flex-col">
+
+                                <div
+                                    className="flex w-full items-center gap-2"
+                                    onDragEnter={(e) => handleDragEnter(e, index)}
+                                    onDragOver={(e) => e.preventDefault()}
+                                >
+
+                                    <div
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, index)}
+                                        onDragEnd={handleDragEnd}
+                                        className={`group flex flex-1 items-center rounded-xl bg-white px-3 py-1 shadow-sm border transition-all duration-300 focus-within:shadow-md focus-within:border-green-700 focus-within:hover:border-green-700 ${
+                                            isDragged
+                                                ? 'opacity-30 scale-95 border-dashed border-green-700 shadow-none'
+                                                : 'border-white/60 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <div className="flex-1">
+                                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 md:text-xs cursor-default">
+                                                {labelText}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={point.value}
+                                                onChange={(e) => updatePointValue(point.id, e.target.value)}
+                                                placeholder={`Wpisz ${labelText.toLowerCase()}...`}
+                                                className="w-full bg-transparent text-sm font-medium text-slate-800 placeholder:text-slate-300 focus:outline-none"
+                                                draggable
+                                                onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        alert(`Wpisano ${labelText}: ${e.currentTarget.value}`);
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div className="ml-2 flex items-center text-slate-300">
+                                            <div title="Chwyć i przenieś" className="hover:text-slate-500 transition-colors p-1 cursor-grab active:cursor-grabbing">
+                                                <Menu size={16} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {canDelete ? (
+                                        <button
+                                            onClick={() => removeStop(point.id)}
+                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/50 text-slate-500 shadow-sm transition-colors hover:bg-white hover:text-red-500"
+                                            title="Usuń przystanek"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    ) : (
+                                        <div className="h-8 w-8 shrink-0"></div>
+                                    )}
+                                </div>
+
+                                {!isLast && (
+                                    <div className={`relative my-1.5 flex items-center justify-center opacity-60 pr-10 transition-opacity ${isDragged ? 'opacity-0' : ''}`}>
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span className="h-1 w-1 rounded-full bg-slate-800"></span>
+                                            <span className="h-1 w-1 rounded-full bg-slate-800"></span>
+                                            <span className="h-1 w-1 rounded-full bg-slate-800"></span>
+                                        </div>
+
+                                        <button
+                                            onClick={() => addStop(index + 1)}
+                                            className="absolute right-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/70 text-green-700 shadow-sm transition-colors hover:bg-white border border-transparent hover:border-green-700"
+                                            title="Dodaj przystanek tutaj"
+                                        >
+                                            <Plus size={14} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
 
                 <button
                     onClick={handlePlaceholderClick}
-                    className="group relative mt-auto flex h-10 w-full items-center overflow-hidden rounded-full bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 shadow-sm transition-colors duration-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 md:h-11 md:text-sm"
+                    className="group relative mt-auto flex h-10 w-full items-center overflow-hidden rounded-full bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 shadow-sm transition-colors duration-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-700 focus:ring-offset-2 md:h-11 md:text-sm"
                 >
-                    <span className="absolute left-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-green-600 transition-transform duration-700 ease-out group-hover:scale-[250]"></span>
+                    <span className="absolute left-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-green-700 transition-transform duration-700 ease-out group-hover:scale-[250]"></span>
 
                     <div className="relative z-10 flex w-full items-center justify-center gap-2 px-5 transition-all duration-500">
 
