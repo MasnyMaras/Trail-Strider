@@ -1,2 +1,4 @@
 fastapi
 fastapi-cli
+sqlalchemy
+psycopg[binary]

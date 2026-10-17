@@ -10,6 +10,8 @@ idna==3.20
 markdown-it-py==4.2.0
 mdurl==0.1.2
 opentelemetry-api==1.45.1
+psycopg==3.3.6
+psycopg-binary==3.3.6
 pydantic==2.14.1
 pydantic_core==2.50.1
 Pygments==2.21.0
@@ -18,6 +20,7 @@ PyYAML==6.0.3
 rich==15.0.0
 rich-toolkit==0.20.6
 shellingham==1.5.4
+SQLAlchemy==2.1.5
 starlette==1.8.0
 typer==0.27.3
 typing-inspection==0.4.4

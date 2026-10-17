@@ -57,6 +57,15 @@ services:
       - "127.0.0.1:8000:8000"            # tylko z tego komputera
     volumes:
       - ./backend/app:/code/app:ro       # kod z repo widoczny w kontenerze (tylko odczyt)
+    environment:
+      PGHOST: db                         # adres bazy = nazwa usługi w sieci projektu
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB}         # wartości z pliku .env
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy       # backend startuje dopiero, gdy baza jest (healthy)
     healthcheck:                         # Docker co 30 s pyta /api/health z wnętrza kontenera
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"]
       interval: 30s

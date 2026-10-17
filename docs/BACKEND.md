@@ -1,6 +1,7 @@
 # BACKEND – serwer API (FastAPI, folder `backend/`)
 Instrukcja uruchamia backend projektu: serwer API w Pythonie (FastAPI) w kontenerze Dockera.
-Na tym etapie backend ma jeden testowy endpoint `GET /api/health`. Połączenie z bazą i routingiem dojdzie w kolejnych wersjach.
+Na tym etapie backend ma dwa endpointy kontrolne: `GET /api/health` (czy backend działa) i `GET /api/health/db`
+(czy działa połączenie z bazą). Połączenie z routingiem dojdzie w kolejnych wersjach.
 
 **Wymagania:** najpierw wykonaj w całości `docs/SETUP.md` oraz `docs/BROUTER.md`.
 
@@ -36,26 +37,29 @@ ss -ltn | grep 8000
 docker compose up -d --build backend
 ```
 - `--build` – buduje obraz z `backend/Dockerfile`: Python 3.12 + biblioteki z `backend/requirements.txt` (przypięte wersje),
-- za pierwszym razem Docker pobiera obraz Pythona (ok. 45 MB) i instaluje biblioteki – ok. 40 s.
+- za pierwszym razem Docker pobiera obraz Pythona (ok. 45 MB) i instaluje biblioteki – ok. 40 s,
+- backend startuje dopiero, gdy baza (`db`) ma status `(healthy)`; jeśli baza nie działa, Compose uruchomi ją sam.
 
 **Sprawdź po** (odczekaj ok. 15 s po uruchomieniu):
 ```bash
 docker compose ps backend
 docker compose logs backend | tail -n 3
 curl -s http://127.0.0.1:8000/api/health
+curl -s http://127.0.0.1:8000/api/health/db
 docker image ls trail-strider-backend
 ```
 
 **Wymagane:**
 | komenda | musi pokazać |
 |---|---|
-| `docker compose up ...` (koniec wyniku) | `Image trail-strider-backend Built`, `Container trail-strider-backend-1 Started` |
+| `docker compose up ...` (koniec wyniku) | `Image trail-strider-backend Built`, `Container trail-strider-db-1 Healthy`, `Container trail-strider-backend-1 Started` |
 | `docker compose ps backend` | `trail-strider-backend-1`, status `Up ... (healthy)`, port `127.0.0.1:8000->8000/tcp` (tuż po starcie: `(health: starting)`) |
 | `docker compose logs ... \| tail -n 3` | ostatnia linia: `Application startup complete.` |
-| `curl ...` | `{"status":"ok"}` |
+| `curl .../api/health` | `{"status":"ok"}` |
+| `curl .../api/health/db` | `{"db":"ok","postgis":"3.6.4"}` |
 | `docker image ls ...` | `trail-strider-backend:latest` |
 
-Otwórz w przeglądarce `http://127.0.0.1:8000/docs` – strona **„Trail-Strider API”** z endpointem `GET /api/health`.
+Otwórz w przeglądarce `http://127.0.0.1:8000/docs` – strona **„Trail-Strider API”** z endpointami `GET /api/health` i `GET /api/health/db`.
 To dokumentacja API generowana automatycznie z kodu; przycisk **Try it out → Execute** wysyła prawdziwe zapytanie.
 
 ✅ **Backend działa.**
@@ -74,6 +78,7 @@ docker compose logs -f backend     # logi na żywo (Ctrl+C kończy podgląd, nie
 |---|---|
 | zmiana kodu w `backend/app/` | nic – serwer przeładowuje się sam po zapisie pliku (w logach: `WatchFiles detected changes ... Reloading...`) |
 | zmiana `backend/requirements.txt` albo `backend/Dockerfile` (np. po `git pull`) | `docker compose up -d --build backend` – bez `--build` zostaje stary obraz |
+| `/api/health/db` zwraca `{"detail":"database unavailable"}` (kod 503) | baza nie działa: `docker compose ps db`, uruchom ją: `docker compose up -d db` |
 | backend `(unhealthy)` po `git pull` / `git pull --rebase` / przenoszeniu plików (`curl` nic nie zwraca, w logach `Could not import module "app.main"`) | `docker compose up -d --force-recreate backend` |
 
 ℹ️ Kontener widzi folder `backend/app` bezpośrednio z repozytorium (bind mount). Gdy folder zostanie usunięty
@@ -112,10 +117,13 @@ docker run --rm -v "$PWD/backend:/b:ro" \
 | plik | co zawiera |
 |---|---|
 | `app/main.py` | kod API (endpointy) |
+| `app/db.py` | połączenie z bazą: pula połączeń SQLAlchemy (sterownik psycopg), dane logowania ze zmiennych `PG...` |
 | `app/__init__.py` | pusty – oznacza, że `app` to pakiet Pythona |
 | `Dockerfile` | przepis na obraz (Python 3.12, przypięty digestem) |
-| `requirements.in` | biblioteki wybrane świadomie: `fastapi`, `fastapi-cli` |
+| `requirements.in` | biblioteki wybrane świadomie: `fastapi`, `fastapi-cli`, `sqlalchemy`, `psycopg[binary]` |
 | `requirements.txt` | pełna lista bibliotek z wersjami – z niej budowany jest obraz |
 
 Usługa `backend` w `compose.yaml`: port `127.0.0.1:8000`, kod z `backend/app` podpięty do kontenera
-(tylko odczyt), automatyczne przeładowanie (`--reload`) – ustawienia do pracy lokalnej; healthcheck co 30 s.
+(tylko odczyt), automatyczne przeładowanie (`--reload`) – ustawienia do pracy lokalnej; healthcheck co 30 s;
+dane logowania do bazy w zmiennych `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` (wartości z `.env`);
+`depends_on` – backend czeka, aż baza będzie `(healthy)`.
