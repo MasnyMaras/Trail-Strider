@@ -44,6 +44,13 @@ services:
     # brouter config parameters based on: 
     # https://github.com/abrensch/brouter/blob/master/README.md
     # https://zod.github.io/brouter/developers/docker_guide.html
+  backend:
+    build: ./backend                     # obraz budowany z backend/Dockerfile
+    command: ["fastapi", "run", "app/main.py", "--port", "8000", "--reload"]   # jak CMD + przeładowanie (tylko do pracy lokalnej)
+    ports:
+      - "127.0.0.1:8000:8000"            # tylko z tego komputera
+    volumes:
+      - ./backend/app:/code/app:ro       # kod z repo widoczny w kontenerze (tylko odczyt)
 
 volumes:
   pgdata:
