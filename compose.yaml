@@ -12,6 +12,12 @@ services:
       - "127.0.0.1:5432:5432"            # tylko z tego komputera, nie z sieci
     volumes:
       - pgdata:/var/lib/postgresql       # dane bazy przeżyją usunięcie kontenera
+    healthcheck:                         # Docker co 10 s sprawdza, czy baza przyjmuje połączenia
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      interval: 10s                      # co ile sprawdzać
+      timeout: 5s                        # dłużej = porażka
+      retries: 5                         # tyle porażek z rzędu = unhealthy
+      start_period: 30s                  # czas na rozruch: porażki się nie liczą
 
   osm2pgsql:
     #image: iboates/osm2pgsql:2.3.1       # przypięta wersja
@@ -51,6 +57,12 @@ services:
       - "127.0.0.1:8000:8000"            # tylko z tego komputera
     volumes:
       - ./backend/app:/code/app:ro       # kod z repo widoczny w kontenerze (tylko odczyt)
+    healthcheck:                         # Docker co 30 s pyta /api/health z wnętrza kontenera
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   pgdata:

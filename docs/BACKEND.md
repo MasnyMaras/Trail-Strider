@@ -38,7 +38,7 @@ docker compose up -d --build backend
 - `--build` – buduje obraz z `backend/Dockerfile`: Python 3.12 + biblioteki z `backend/requirements.txt` (przypięte wersje),
 - za pierwszym razem Docker pobiera obraz Pythona (ok. 45 MB) i instaluje biblioteki – ok. 40 s.
 
-**Sprawdź po:**
+**Sprawdź po** (odczekaj ok. 15 s po uruchomieniu):
 ```bash
 docker compose ps backend
 docker compose logs backend | tail -n 3
@@ -50,7 +50,7 @@ docker image ls trail-strider-backend
 | komenda | musi pokazać |
 |---|---|
 | `docker compose up ...` (koniec wyniku) | `Image trail-strider-backend Built`, `Container trail-strider-backend-1 Started` |
-| `docker compose ps backend` | `trail-strider-backend-1`, status `Up`, port `127.0.0.1:8000->8000/tcp` |
+| `docker compose ps backend` | `trail-strider-backend-1`, status `Up ... (healthy)`, port `127.0.0.1:8000->8000/tcp` (tuż po starcie: `(health: starting)`) |
 | `docker compose logs ... \| tail -n 3` | ostatnia linia: `Application startup complete.` |
 | `curl ...` | `{"status":"ok"}` |
 | `docker image ls ...` | `trail-strider-backend:latest` |
@@ -74,14 +74,20 @@ docker compose logs -f backend     # logi na żywo (Ctrl+C kończy podgląd, nie
 |---|---|
 | zmiana kodu w `backend/app/` | nic – serwer przeładowuje się sam po zapisie pliku (w logach: `WatchFiles detected changes ... Reloading...`) |
 | zmiana `backend/requirements.txt` albo `backend/Dockerfile` (np. po `git pull`) | `docker compose up -d --build backend` – bez `--build` zostaje stary obraz |
-| backend przestał odpowiadać po `git pull` / `git pull --rebase` / przenoszeniu plików (`curl` nic nie zwraca, w logach `Could not import module "app.main"`) | `docker compose up -d --force-recreate backend` |
+| backend `(unhealthy)` po `git pull` / `git pull --rebase` / przenoszeniu plików (`curl` nic nie zwraca, w logach `Could not import module "app.main"`) | `docker compose up -d --force-recreate backend` |
 
 ℹ️ Kontener widzi folder `backend/app` bezpośrednio z repozytorium (bind mount). Gdy folder zostanie usunięty
 i utworzony na nowo (robi to np. `git pull --rebase`), kontener dalej widzi stary, pusty folder –
 dlatego trzeba go odtworzyć (`--force-recreate`).
 
-ℹ️ `docker compose ps` może pokazywać `Up`, mimo że serwer nie odpowiada (status dotyczy procesu
-obserwującego pliki). O tym, czy backend działa, rozstrzyga `curl`.
+ℹ️ **Healthcheck.** Docker co 30 s wysyła z wnętrza kontenera zapytanie do `/api/health`. Wynik widać
+w `docker compose ps` przy statusie: `(healthy)` – backend odpowiada, `(unhealthy)` – 3 nieudane próby
+z rzędu, backend nie działa (sprawdź `docker compose logs backend`). Healthcheck niczego nie restartuje,
+tylko pokazuje stan. Zapytania healthchecku są widoczne w logach jako `127.0.0.1:... "GET /api/health" 200 OK`.
+
+ℹ️ Baza (`db`) też ma healthcheck (`pg_isready`): `docker compose ps db` pokazuje `(healthy)`.
+Pierwsze `docker compose up -d db` po pobraniu tej wersji odtworzy kontener bazy (zmieniła się jego
+konfiguracja) – dane zostają w wolumenie.
 
 ---
 
@@ -112,4 +118,4 @@ docker run --rm -v "$PWD/backend:/b:ro" \
 | `requirements.txt` | pełna lista bibliotek z wersjami – z niej budowany jest obraz |
 
 Usługa `backend` w `compose.yaml`: port `127.0.0.1:8000`, kod z `backend/app` podpięty do kontenera
-(tylko odczyt), automatyczne przeładowanie (`--reload`) – ustawienia do pracy lokalnej.
+(tylko odczyt), automatyczne przeładowanie (`--reload`) – ustawienia do pracy lokalnej; healthcheck co 30 s.
