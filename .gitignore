@@ -65,3 +65,6 @@ pnpm-debug.log*
 *.rd5
 *.tif
 *.tiff
+
+# skrypty SQL projektu (wyjatek od *.sql)
+!/db/sql/*.sql

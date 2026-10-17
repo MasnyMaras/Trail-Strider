@@ -704,3 +704,81 @@ git status --short
 ℹ️ Źródło danych: Bank Danych o Lasach, Lasy Państwowe. Źródło i data pobrania są zapisane
 w komentarzu każdej tabeli (`\dt+ bdl.*`). Przy publikacji wyników podajemy źródło.
 Odległości liczymy po przeliczeniu do układu metrycznego (`ST_Transform(geom, 2180)`), nie w EPSG:3857.
+
+---
+
+## Krok 14. Punkty noclegowe w obszarach „Zanocuj w lesie” (`bdl.zanocuj_punkty`)
+
+Obszary programu to duże poligony (średnio ok. 5 km²). Do wyboru noclegu potrzebujemy konkretnych
+punktów, więc skrypt `db/sql/zanocuj_punkty.sql` dzieli każdy obszar na punkty:
+
+- siatka kwadratów 2236 m (1 komórka = 5 km²), w każdej komórce **co najwyżej 1 punkt**,
+- punkt leży **na ścieżce lub drodze leśnej** (`highway=track|path|footway|bridleway`, bez prywatnych
+  i zakazanych dla pieszych) w miejscu najbliższym środka komórki – do każdego punktu da się dojść,
+- obszar bez żadnej ścieżki dostaje 1 punkt w środku (`przy_sciezce = false`),
+- przy każdym punkcie zapisany jest rodzaj i odległość najbliższej wody z OSM
+  (źródło, zbiornik, rzeka, strumień; bez rowów, kanałów i cieków okresowych),
+- **super punkt** (`super = true`) – najbliższa woda w odległości do 200 m.
+  Takie punkty algorytm ma preferować przy wyborze noclegu.
+
+Próg ustawia się na początku skryptu (`\set prog_wody_m 200`), gęstość siatki – `\set bok_m 2236`.
+W Małopolsce super punktów jest 61%, prawie wyłącznie przy górskich potokach, które są w OSM bardzo gęste.
+
+| kolumna | znaczenie |
+|---|---|
+| `obszar_id` | `id` obszaru z `bdl.zanocuj_w_lesie` |
+| `wojewodztwo` | region, dla którego wyliczono punkt |
+| `przy_sciezce` | `false` = obszar bez ścieżek, punkt w środku |
+| `woda_rodzaj` | `zrodlo`, `zbiornik`, `rzeka`, `strumien` albo NULL (brak wody w ok. 2 km) |
+| `woda_odl_m` | odległość do najbliższej wody [m] |
+| `super` | punkt preferowany (blisko wody) |
+| `geom` | punkt, EPSG:3857 |
+
+⚠️ `obszar_id` zależy od kolejności ładowania w `bdl_load.py`. **Po każdym ponownym uruchomieniu
+`bdl_load.py` uruchom też ten skrypt.**
+
+**Sprawdź przed:**
+```bash
+pwd
+docker compose exec db psql -U osm -d osm -P pager=off -c "SELECT count(*) FROM bdl.zanocuj_w_lesie;"
+```
+
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| `pwd` | `/home/<twoja-nazwa>/Trail-Strider` |
+| `SELECT count(*) ...` | `1237` (Krok 13 wykonany) |
+
+**Wykonaj:**
+```bash
+docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/zanocuj_punkty.sql
+```
+- skrypt działa w konsoli `psql` (używa poleceń `\set`, `\if`) – **nie uruchamiaj go w DBeaverze**,
+- całość jest jedną transakcją: przy błędzie baza zostaje bez zmian,
+- domyślnie liczy województwo małopolskie; inne: dopisz `-v "wojewodztwo=województwo pomorskie"`
+  (wymaga zaimportowanych danych OSM tego województwa),
+- ponowne uruchomienie zastępuje punkty danego województwa (komunikaty `already exists, skipping` są wtedy normalne),
+- trwa kilka sekund.
+
+**Wymagane (końcówka wyniku, dane OSM z 1.10.2026 i BDL z 10.10.2026):**
+| tabelka | musi pokazać |
+|---|---|
+| podsumowanie | `obszary 70`, `punkty 309`, `przy_sciezce 309`, `obszary_bez_sciezek 0`, `super 190`, `super_proc 61` |
+| super punkty wg wody | `strumien 183`, `zbiornik 5`, `rzeka 2` |
+| ostatnia linia | `COMMIT` |
+
+❌ `ROLLBACK` albo `ERROR` – zatrzymaj się i zgłoś.
+
+**Sprawdź po (DBeaver, zakładka Spatial):**
+```sql
+SELECT p.super, p.woda_rodzaj, p.woda_odl_m, p.geom
+FROM bdl.zanocuj_punkty p
+UNION ALL
+SELECT NULL, 'obszar', NULL, z.geom
+FROM bdl.zanocuj_w_lesie z
+WHERE z.id IN (SELECT obszar_id FROM bdl.zanocuj_punkty);
+```
+Punkty leżą na drogach i ścieżkach wewnątrz obszarów; super punkty – tuż przy wodzie.
+
+ℹ️ Woda pochodzi z OSM: część małych strumieni i źródeł w lasach nie jest zmapowana, więc brak super
+punktu nie oznacza braku wody.
