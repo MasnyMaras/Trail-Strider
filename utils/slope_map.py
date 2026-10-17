@@ -74,7 +74,7 @@ def main():
     slope = horn_slope_deg(dem, args.res)
     slope[np.isnan(dem)] = np.nan
 
-    # Save data
+    # Save data:
     with rasterio.open(
         args.out, "w", driver="GTiff", height=dst_h, width=dst_w, count=1,
         dtype="float32", crs=dst_crs, transform=dst_transform,
