@@ -20,5 +20,5 @@ print(route_json)
 print(route_gpx)
 
 # save gpx text as a file:
-with open("output/test.gpx", "w", encoding="utf-8") as file:
-    file.write(route_gpx)
+# with open("output/test.gpx", "w", encoding="utf-8") as file:
+#     file.write(route_gpx)
