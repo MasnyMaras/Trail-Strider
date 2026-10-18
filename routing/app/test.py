@@ -1,11 +1,10 @@
 # example usage of routing.py
 import routing
 
-coordinates = [ # correct input data format example
-    [19.935833, 49.307500],
-    [19.934084, 49.251005],
-    [19.980521, 49.269497],
-    [19.949600, 49.299200],
+coordinates = [ # correct input data format example (tile E20_N50)
+    [20.944980, 50.064650],
+    [20.936580, 50.061430],
+    [20.950000, 50.055000],
 ]
 
 # get route:

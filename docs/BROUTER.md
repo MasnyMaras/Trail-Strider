@@ -1,91 +1,143 @@
-# Setup guide for local docker brouter image
-This guide explains how to run BRouter locally using Docker Compose. It covers downloading routing data, configuring the service, starting the container, and testing a route.
+# BROUTER – silnik wyznaczania tras (usługa `brouter`)
+Instrukcja uruchamia BRouter – gotowy program do wyznaczania tras pieszych i rowerowych –
+w kontenerze Dockera i sprawdza, że wyznacza trasę.
 
-## 1. Routing data directory
-Navigate to the project directory:
+**Wymagania:** wykonany `docs/SETUP.md` (Docker, repozytorium, plik `.env`).
+
+ℹ️ **Robiłeś już poprzednią wersję tej instrukcji** (`docs/BROUTER_OLD.md`) i Twój BRouter działa?
+Nie powtarzaj tej instrukcji – przejdź do `docs/ROUTING.md`.
+
+**Zasady:**
+- Każdy krok: **Sprawdź przed → Wykonaj → Sprawdź po.**
+- Wynik musi się zgadzać z tabelą „Wymagane”. Jeśli nie – **zatrzymaj się** i zgłoś, nie idź dalej.
+- Wszystkie komendy wykonujesz w `~/Trail-Strider`.
+
+---
+
+## Krok 1. Kafel z danymi (`.rd5`)
+
+BRouter liczy trasy na podstawie plików `.rd5` („kafli”). Każdy kafel obejmuje obszar 5° × 5°,
+a nazwa to jego lewy dolny (południowo-zachodni) róg: `E20_N50` = długość 20–25°E, szerokość 50–55°N.
+
+Kafle nie są w repozytorium (za duże, wykluczone w `.gitignore`) – każdy pobiera je sam.
+Folder `routing/segments4` po pobraniu repozytorium **nie istnieje** (Git nie przechowuje pustych folderów).
+
+**Sprawdź przed:**
 ```bash
 cd ~/Trail-Strider
+ls routing/segments4
+df -h /
 ```
-Create routing directory & get `.rd5` files e.g. with tile corner in 45°N 15°E (in Lesser Poland Voivodeship). 
-Check if rd5 files got downloaded:
+
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| `ls routing/segments4` | `No such file or directory` (folder jeszcze nie istnieje) |
+| `df -h /` | kolumna `Avail`: co najmniej **1G** |
+
+**Wykonaj:**
 ```bash
 mkdir -p routing/segments4
-wget -O routing/segments4/E20_N50.rd5 \https://brouter.de/brouter/segments4/E20_N50.rd5
+wget -P routing/segments4 https://brouter.de/brouter/segments4/E20_N50.rd5
 ```
-BRouter uses `.rd5` files containing routing data for geographic areas measuring 5° × 5°. The tile name identifies the southwest corner of the area it covers.
+- `mkdir -p` – tworzy folder (podpięty do kontenera BRoutera – musi istnieć przed jego uruchomieniem),
+- `wget -P <folder>` – zapisuje plik w podanym folderze pod oryginalną nazwą.
 
-Verify the downloaded file:
+**Sprawdź po:**
 ```bash
-ls -lh routing/segments4/
+ls -l routing/segments4
+git check-ignore -v routing/segments4/E20_N50.rd5
 ```
 
-Expected output contains the `.rd5` file name. (In this example: `E15_N45.rd5`)
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| `ls -l routing/segments4` | `E20_N50.rd5`, rozmiar ok. **68,6 MB** (stan 12.10.2026: `68623840`) |
+| `git check-ignore -v ...` | `.gitignore:65:*.rd5	routing/segments4/E20_N50.rd5` (plik nie trafi do repozytorium) |
 
-## 2. Docker image
-In main project directory:
-```bash
-docker compose config --quiet
-```
-If the configuration is valid, the command should finish without displaying an error.
+⚠️ Serwer BRoutera aktualizuje kafle co jakiś czas i nie udostępnia wersji z datą – rozmiar może się
+nieznacznie różnić. Liczy się, że plik się pobrał (bez błędu `wget`) i ma kilkadziesiąt MB.
 
-To list the services defined in the Compose configuration, run:
+ℹ️ **Zasięg:** `E20_N50` obejmuje tylko wschodnią część Małopolski. Kraków (~19,9°E) leży w `E15_N50`,
+Tatry w `E20_N45`. Punkt poza pobranymi kaflami daje błąd `datafile E15_N45.rd5 not found` (krok 3).
+Które kafle pobieramy docelowo – do ustalenia w zespole.
+
+---
+
+## Krok 2. Uruchomienie BRoutera
+
+**Sprawdź przed:**
 ```bash
+ss -ltn | grep 17777
 docker compose config --services
 ```
 
-Download the configured image, and start the service in the background:
-```bash
-docker compose pull brouter
-docker compose up -d brouter
-```
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| `ss -ltn \| grep 17777` | pusto (port 17777 wolny) |
+| `docker compose config --services` | na liście jest `brouter` |
 
-Check the container status and http connection:
-```bash
-docker compose ps
-docker compose port brouter 17777
-```
-expected output:
-```text
-NAME                      IMAGE                              COMMAND                  SERVICE   CREATED             STATUS             PORTS
-trail-strider-brouter-1   ghcr.io/abrensch/brouter:nightly   "/__cacert_entrypoin…"   brouter   time of creation    Up ...             127.0.0.1:17777->17777/tcp
-127.0.0.1:17777
-```
-
-Check logs:
-```bash
-docker compose logs --tail=50 brouter
-```
-No errors should appear.
-
-## 3. Routing test
-Test the routing:
-```bash
-curl -i --get "http://localhost:17777/brouter" \
-  --data-urlencode "lonlats=20.94498,50.06465|20.93658,50.06143" \
-  --data-urlencode "profile=trekking" \
-  --data-urlencode "alternativeidx=0" \
-  --data-urlencode "format=geojson"
-```
-A successful request should return an HTTP status similar to:
-```text
-HTTP/1.1 200 OK
-Content-Type: application/vnd.geo+json; charset=utf-8
-```
-The response body should contain valid GeoJSON, typically including a feature and a route geometry.
-
-## 4 Starting and stopping brouter
-
-Start brouter:
-```bash
-docker compose start brouter
-```
-
-or run brouter:
+**Wykonaj:**
 ```bash
 docker compose up -d brouter
 ```
+Za pierwszym razem Docker pobierze obraz BRoutera (`ghcr.io/abrensch/brouter`, ok. 95 MB).
 
-Stop brouter:
+**Sprawdź po:**
 ```bash
-docker compose stop brouter
+docker compose ps brouter
+```
+
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| `docker compose ps brouter` | `trail-strider-brouter-1`, status `Up`, port `127.0.0.1:17777->17777/tcp` |
+
+ℹ️ W logach (`docker compose logs brouter`) mogą się pojawić linie `RouteServer got exception (will continue):
+java.lang.NullPointerException ... "getline" is null`. Oznaczają połączenie z portem BRoutera bez zapytania HTTP
+(np. test połączenia) – BRouter działa dalej. O tym, czy działa poprawnie, rozstrzyga test w kroku 3.
+
+ℹ️ BRouter ma w `compose.yaml` ustawienie `restart: unless-stopped` – po restarcie komputera uruchomi się sam,
+chyba że zatrzymałeś go ręcznie (`docker compose stop`).
+
+⚠️ Obraz BRoutera jest na tagu `nightly` (nieprzypięta wersja) – u różnych osób wersja może się różnić.
+Stan na 18.10.2026: `BRouter-1.7.11-beta`.
+
+---
+
+## Krok 3. Test wyznaczania trasy
+
+**Wykonaj:**
+```bash
+curl -s "http://127.0.0.1:17777/brouter?lonlats=20.94498,50.06465|20.93658,50.06143&profile=trekking&alternativeidx=0&format=geojson" \
+  | python3 -c "import json,sys; p=json.load(sys.stdin)['features'][0]['properties']; print(p['creator'], p['track-length'])"
+curl -s "http://127.0.0.1:17777/brouter?lonlats=19.935833,49.3075|19.934084,49.251005&profile=trekking&format=geojson"; echo
+```
+- pierwsza komenda – trasa między dwoma punktami w kaflu `E20_N50`; z odpowiedzi (GeoJSON)
+  wypisuje wersję BRoutera i długość trasy w metrach,
+- `lonlats=` – punkty w kolejności **długość,szerokość** (`lon,lat`), rozdzielone `|`,
+- druga komenda – punkty w Tatrach, poza pobranym kaflem (test komunikatu błędu).
+
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| trasa | `BRouter-1.7.11-beta 1707` |
+| punkty poza kaflem | `datafile E15_N45.rd5 not found` |
+
+Długość `1707` (metrów) dotyczy kafla ze stanu 12.10.2026 – przy nowszym kaflu może się nieznacznie różnić.
+
+ℹ️ Profil `trekking` to profil **rowerowy** BRoutera. Wybór profilu pieszego – do ustalenia
+(osoba odpowiedzialna za routing).
+
+✅ **BRouter działa.** Dalej: `docs/ROUTING.md`.
+
+---
+
+## Codzienna praca
+
+```bash
+docker compose up -d brouter          # uruchom
+docker compose stop brouter           # zatrzymaj
+docker compose logs --tail 50 brouter # ostatnie logi
 ```
