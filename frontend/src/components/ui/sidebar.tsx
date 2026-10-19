@@ -1,35 +1,41 @@
 import { useState} from "react";
 import { ChevronLeft, ChevronRight, Download, Plus, Menu, X } from "lucide-react";
+import type { RoutePoint } from "@/types/route";
 
 interface SidebarProps {
     isOpen: boolean;
     onToggle: () => void;
+    points: RoutePoint[];
+    onAddStop: (insertIndex: number) => void;
+    onRemoveStop: (id: string) => void;
+    onUpdatePointValue: (id: string, newValue: string) => void;
+    onReorderPoints: (newPoints: RoutePoint[]) => void;
 }
-interface RoutePoint {
-    id: string;
-    value: string;
-}
-export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
-    const [points, setPoints] = useState<RoutePoint[]>([
-        { id: "start-initial", value: "" },
-        { id: "end-initial", value: "" }
-    ]);
+
+export default function Sidebar({
+                                isOpen,
+                                onToggle,
+                                points,
+                                onAddStop,
+                                onRemoveStop,
+                                onUpdatePointValue,
+                                onReorderPoints,
+}: SidebarProps) {
+
 
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
     const addStop = (insertIndex: number) => {
-        const newPoints = [...points];
-        newPoints.splice(insertIndex, 0, { id: `point-${Date.now()}`, value: "" });
-        setPoints(newPoints);
+        onAddStop(insertIndex);
     };
 
     const removeStop = (idToRemove: string) => {
-        setPoints(points.filter(p => p.id !== idToRemove));
+        onRemoveStop(idToRemove);
     };
 
     const updatePointValue = (id: string, newValue: string) => {
-        setPoints(points.map(p => p.id === id ? { ...p, value: newValue } : p));
-    };
+        onUpdatePointValue(id, newValue);
+    }
 
     const handleDragStart = (e: React.DragEvent, index: number) => {
         setDraggedIndex(index);
@@ -39,12 +45,10 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
     const handleDragEnter = (_e: React.DragEvent, targetIndex: number) => {
         if (draggedIndex === null || draggedIndex === targetIndex) return;
 
-        setPoints((prev) => {
-            const newPoints = [...prev];
-            const [moved] = newPoints.splice(draggedIndex, 1);
-            newPoints.splice(targetIndex, 0, moved);
-            return newPoints;
-        });
+        const newPoints = [...points];
+        const [moved] = newPoints.splice(draggedIndex, 1);
+        newPoints.splice(targetIndex, 0, moved);
+        onReorderPoints(newPoints);
 
         setDraggedIndex(targetIndex);
     };
@@ -80,7 +84,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 <div
                     className="flex flex-1 flex-col overflow-y-auto pb-4 pr-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-green-700 [&::-webkit-scrollbar-thumb]:rounded-full [scrollbar-width:thin] [scrollbar-color:theme(colors.green.700)_transparent]"
                     onWheel={(e) => e.stopPropagation()}
-                    onDragOver={(e) => e.preventDefault()} /* <--- DODANO TĘ LINIJKĘ */
+                    onDragOver={(e) => e.preventDefault()}
                 >
                     {points.map((point, index) => {
                         const isFirst = index === 0;
