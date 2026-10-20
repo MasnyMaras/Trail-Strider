@@ -2,3 +2,5 @@ fastapi
 fastapi-cli
 requests
 gpxpy
+ortools
+numpy
