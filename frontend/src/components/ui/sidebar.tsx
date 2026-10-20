@@ -1,5 +1,5 @@
 import { useState} from "react";
-import { ChevronLeft, ChevronRight, Download, Plus, Menu, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Plus, Menu, X, Route } from "lucide-react";
 import type { RoutePoint } from "@/types/route";
 
 interface SidebarProps {
@@ -10,6 +10,9 @@ interface SidebarProps {
     onRemoveStop: (id: string) => void;
     onUpdatePointValue: (id: string, newValue: string) => void;
     onReorderPoints: (newPoints: RoutePoint[]) => void;
+    isAutoMode: boolean;
+    onAutoModeToggle: (newState: boolean) => void;
+    onOpenPreferences: () => void;
 }
 
 export default function Sidebar({
@@ -20,6 +23,9 @@ export default function Sidebar({
                                 onRemoveStop,
                                 onUpdatePointValue,
                                 onReorderPoints,
+                                isAutoMode,
+                                onAutoModeToggle,
+                                onOpenPreferences,
 }: SidebarProps) {
 
 
@@ -56,10 +62,14 @@ export default function Sidebar({
     const handleDragEnd = () => {
         setDraggedIndex(null);
     };
-
+    const handleAutoModeToggle = () => {
+        const newState = !isAutoMode;
+        onAutoModeToggle(newState);
+        /*alert(`Tryb automatyczny: ${newState ? "włączony" : "wyłączony"}`);*/
+    };
     const handlePlaceholderClick = () => {
         console.log("[Sidebar] Action button clicked");
-        alert("Zapisano ustawienia");
+        alert("Zapisano trase");
     };
 
     return (
@@ -77,10 +87,26 @@ export default function Sidebar({
             </button>
 
             <div className="flex flex-1 flex-col overflow-hidden p-4 md:p-6">
-                <h2 className="mb-6 text-center text-2xl font-['Pacifico'] tracking-wide text-green-700 drop-shadow-sm md:text-3xl">
+                <h2 className="mb-6 text-center text-2xl font-['Luckiest_Guy'] tracking-wide text-green-700 drop-shadow-sm md:text-3xl">
                     Planowanie trasy
                 </h2>
-
+                <div className="mb-4 flex items-center justify-between rounded-xl bg-white/60 px-4 py-3 shadow-sm border border-white/60">
+                    <span className="text-sm font-bold text-slate-700">Tryb automatyczny</span>
+                    <button
+                        type="button"
+                        onClick={handleAutoModeToggle}
+                        className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-300 ease-in-out focus:outline-none ${
+                            isAutoMode ? "border-green-700 bg-green-700" : "border-slate-300 bg-gray-300"
+                        }`}
+                        aria-pressed={isAutoMode}
+                    >
+                        <span
+                            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ease-in-out ${
+                                isAutoMode ? "translate-x-6" : "translate-x-0.5"
+                            }`}
+                        />
+                    </button>
+                </div>
                 <div
                     className="flex flex-1 flex-col overflow-y-auto pb-4 pr-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-green-700 [&::-webkit-scrollbar-thumb]:rounded-full [scrollbar-width:thin] [scrollbar-color:theme(colors.green.700)_transparent]"
                     onWheel={(e) => e.stopPropagation()}
@@ -172,6 +198,19 @@ export default function Sidebar({
                             </div>
                         );
                     })}
+                    <button
+                        onClick={onOpenPreferences}
+                        className="group relative mt-6 shrink-0 flex h-10 w-full items-center overflow-hidden rounded-full bg-white border border-white/60 text-xs font-medium text-slate-800 shadow-sm transition-colors duration-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-700 focus:ring-offset-2 md:h-11 md:text-sm"
+                    >
+                        <span className="absolute left-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-green-700 transition-transform duration-700 ease-out group-hover:scale-[250]"></span>
+                        <div className="relative z-10 flex w-full items-center justify-center gap-2 px-5 transition-all duration-500">
+                            <span className="w-2 transition-all duration-500 group-hover:w-0 group-hover:-ml-2"></span>
+                            <span className="transition-all duration-500">Podziel trasę</span>
+                            <div className="w-0 overflow-hidden opacity-0 transition-all duration-500 group-hover:w-4 group-hover:opacity-100">
+                                <Route className="h-4 w-4" />
+                            </div>
+                        </div>
+                    </button>
                 </div>
 
                 <button

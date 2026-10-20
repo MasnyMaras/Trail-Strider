@@ -3,11 +3,15 @@ import Header from "@/components/ui/header"
 import MapView from "@/components/map/MapView"
 import Footer from "@/components/ui/footer"
 import Sidebar from "@/components/ui/sidebar"
+import TrailPreferences from "@/components/ui/trail_preferences"
 import { useState } from "react";
 import type { RoutePoint } from "@/types/route"
 
 export function App() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isAutoMode, setIsAutoMode] = useState(false)
+    const [isPreferencesOpen, setIsPreferencesOpen] = useState(false)
+
     const [points, setPoints] = useState<RoutePoint[]>([
         { id: "start-initial", value: "" },
         { id: "end-initial", value: "" },
@@ -74,7 +78,27 @@ export function App() {
             return copy
         })
     }
+    const handlePreferencesSubmit = (preferencesData: {
+        difficulty: number;
+        days: number;
+        accommodation: number[];
+        roadType: number[]
+    }) => {
+        console.log("Ustawione pref:", {
+            points,
+            isAutoMode,
+            preferences: preferencesData
+        });
 
+        alert(
+            `Ustawiono preferencje:\n` +
+            `Poziom trudności (ID): ${preferencesData.difficulty}\n` +
+            `Dni: ${preferencesData.days}\n` +
+            `Noclegi (ID): ${preferencesData.accommodation.length > 0 ? "[" + preferencesData.accommodation.join(", ") + "]" : "Brak"}\n` +
+            `Typ drogi (ID): ${preferencesData.roadType.length > 0 ? "[" + preferencesData.roadType.join(", ") + "]" : "Brak"}`
+        );
+        setIsPreferencesOpen(false);
+    };
 
     return (
         <div className="flex min-h-screen flex-col overflow-hidden bg-slate-50">
@@ -93,6 +117,14 @@ export function App() {
                     onRemoveStop={handleRemovePoint}
                     onUpdatePointValue={handleUpdatePointValue}
                     onReorderPoints={setPoints}
+                    isAutoMode={isAutoMode}
+                    onAutoModeToggle={setIsAutoMode}
+                    onOpenPreferences={() => setIsPreferencesOpen(true)}
+                />
+                <TrailPreferences
+                    isOpen={isPreferencesOpen}
+                    onClose={() => setIsPreferencesOpen(false)}
+                    onSubmit={handlePreferencesSubmit}
                 />
                 <Footer />
             </main>

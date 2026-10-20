@@ -9,7 +9,7 @@ export default function Header() {
         <header className="absolute top-0 left-0 right-0 z-20 flex w-full items-center justify-between bg-white/10 px-6 py-4 backdrop-blur-md shadow-sm border-b border-white/50">
 
             <div>
-                <h1 className="text-3xl md:text-4xl font-['Pacifico'] tracking-wide text-green-700 drop-shadow-md">
+                <h1 className="text-3xl md:text-4xl font-['Luckiest_Guy'] tracking-wide text-green-700 drop-shadow-md">
                     Trail-Strider
                 </h1>
             </div>
