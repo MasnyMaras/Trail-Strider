@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#Mapa nachyleń z Copernicus GLO-30.
+#Slope map from Copernicus GLO-30.
 
 
 #       python utils/slope.py --region malopolskie --dem-dir data/dem --out data/slope_malopolskie.tif
