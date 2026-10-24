@@ -14,7 +14,7 @@ BROUTER_URL = os.getenv("BROUTER_URL", "http://brouter:17777/brouter")
 
 def build_distance_matrix(coordinates: Sequence[Sequence[float]]) -> np.ndarray :
     """
-        Build a pairwise road-distance matrix using BRouter.
+        Build a pairwise road-distance matrix using Haversine distance.
         Calculates the routed distance between every ordered pair of distinct
         coordinates.
 
@@ -23,18 +23,17 @@ def build_distance_matrix(coordinates: Sequence[Sequence[float]]) -> np.ndarray 
         Returns:
             2D, array_like: distance matrix for combinations between given coordinates.
         """
-    n = len(coordinates)
-    matrix = np.zeros((n, n))
+    coords = np.asarray(coordinates)
+    lon = np.radians(coords[:, 0])
+    lat = np.radians(coords[:, 1])
+    dlon = lon[:, None] - lon[None, :]
+    dlat = lat[:, None] - lat[None, :]
 
-    for i, j in product(range(n), repeat=2):
-        if i == j:
-            continue
+    a = (np.sin(dlat / 2.0) ** 2+ np.cos(lat[:, None])* np.cos(lat[None, :])* np.sin(dlon / 2.0) ** 2)
+    a = np.clip(a, 0.0, 1.0)
 
-        route_json = brouter_response([coordinates[i],coordinates[j]])
-        distance = route_json["features"][0]["properties"]["track-length"]
-        matrix[i][j] = distance
-
-    return matrix
+    earth_radius_m = 6371000.0
+    return 2.0 * earth_radius_m * np.arcsin(np.sqrt(a))
 
 def tsp_solution(distance_matrix: np.ndarray) -> list[int]:
     """
@@ -107,11 +106,11 @@ def brouter_response(coordinates: Sequence[Sequence[float]]) -> dict[str, Any]:
         BROUTER_URL,
         params={
             "lonlats": f"{points}",
-            "profile": "trekking",
+            "profile": "hiking-mountain",
             "alternativeidx": 0,
             "format": "geojson",
         },
-        timeout = 10,
+        timeout = 60,
     )
     response.raise_for_status()
     return response.json()
