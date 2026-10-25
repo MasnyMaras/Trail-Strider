@@ -45,8 +45,8 @@ services:
         target: /segments4
         read_only: true
     environment:
-      MAXTHREADS: "2"
-      JAVA_OPTS: "-Xmx128M -Xms128M -Xmn8M -DmaxRunningTime=60 -DuseRFCMimeType=false"
+      MAXTHREADS: "8"
+      JAVA_OPTS: "-Xmx2G -Xms1G -DmaxRunningTime=160 -DuseRFCMimeType=false"
     # brouter config parameters based on: 
     # https://github.com/abrensch/brouter/blob/master/README.md
     # https://zod.github.io/brouter/developers/docker_guide.html

@@ -3,26 +3,28 @@ from collections.abc import Sequence
 from typing import Any, Literal
 
 import requests
+from requests.adapters import HTTPAdapter
 import gpxpy
 import gpxpy.gpx
 import numpy as np
-from itertools import product
+from concurrent.futures import ThreadPoolExecutor
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
+
+_session = requests.Session()
+_session.mount("http://", HTTPAdapter(pool_connections=1, pool_maxsize=8))
 
 BROUTER_URL = os.getenv("BROUTER_URL", "http://brouter:17777/brouter")
 
 def build_distance_matrix(coordinates: Sequence[Sequence[float]]) -> np.ndarray :
     """
-        Build a pairwise road-distance matrix using Haversine distance.
-        Calculates the routed distance between every ordered pair of distinct
-        coordinates.
+    Builds a pairwise distance matrix using the Haversine formula.
 
-        Args:
-            coordinates (list, array_like): list of [lon, lat] points in DD (Decimal Degrees) form.
-        Returns:
-            2D, array_like: distance matrix for combinations between given coordinates.
-        """
+    Args:
+        coordinates (list, array_like): list of [lon, lat] points in DD (Decimal Degrees) form.
+    Returns:
+        np.ndarray: distance matrix for combinations between given coordinates.
+    """
     coords = np.asarray(coordinates)
     lon = np.radians(coords[:, 0])
     lat = np.radians(coords[:, 1])
@@ -37,25 +39,19 @@ def build_distance_matrix(coordinates: Sequence[Sequence[float]]) -> np.ndarray 
 
 def tsp_solution(distance_matrix: np.ndarray) -> list[int]:
     """
-        Find a low-cost route through all nodes using Google OR-Tools.
+    Find a low-cost route through all nodes using Google OR-Tools.
 
-        Args:
-            distance_matrix (2D, array-like): represents the cost of traveling from node i to node j.
-        Returns:
-            order (list, integer): list of node indices in visitation order, including the start and destination.
-        Raises:
-            RuntimeError: If OR-Tools fails to find a solution.
-        """
+    Args:
+        distance_matrix (2D, array-like): represents the cost of traveling from node i to node j.
+    Returns:
+        order (list, integer): list of node indices in visitation order, including the start and destination.
+    Raises:
+        RuntimeError: If OR-Tools fails to find a solution.
+    """
     n = len(distance_matrix)
     if n < 2: return list(range(n))
 
-    manager = pywrapcp.RoutingIndexManager(
-        n,
-        1,
-        [0],
-        [n-1],
-    )
-
+    manager = pywrapcp.RoutingIndexManager(n,1,[0],[n-1])
     routing = pywrapcp.RoutingModel(manager)
 
     def distance_callback(from_index: int, to_index: int) -> int:
@@ -98,11 +94,9 @@ def brouter_response(coordinates: Sequence[Sequence[float]]) -> dict[str, Any]:
     Returns:
         dict: GeoJSON with the generated path.
     """
-    points = "|".join(
-        f"{lon},{lat}" for lon, lat in coordinates
-    )
+    points = "|".join(f"{lon},{lat}" for lon, lat in coordinates)
 
-    response = requests.get(
+    response = _session.get(
         BROUTER_URL,
         params={
             "lonlats": f"{points}",
@@ -110,10 +104,47 @@ def brouter_response(coordinates: Sequence[Sequence[float]]) -> dict[str, Any]:
             "alternativeidx": 0,
             "format": "geojson",
         },
-        timeout = 60,
+        timeout = 160,
     )
     response.raise_for_status()
     return response.json()
+
+def brouter_parallel(coordinates: Sequence[Sequence[float]], max_workers: int = 8,)-> dict[str, Any]:
+    """
+    Generates a route by requesting each consecutive pair of coordinates
+    from BRouter in parallel and merging the resulting route segments.
+
+    Args:
+        coordinates (list, array_like): list of [lon, lat] points in DD (Decimal Degrees) form.
+        max_workers (int): Maximum number of worker threads used to calculate route segments. Defaults to 8.
+
+    Returns:
+        dict: GeoJSON FeatureCollection containing the merged route.
+    """
+    if len(coordinates) <= 2:
+        return brouter_response(coordinates)
+
+    legs = [coordinates[i:i + 2] for i in range(len(coordinates) - 1)]
+    with ThreadPoolExecutor(max_workers) as ex:
+        results = list(ex.map(brouter_response, legs))
+
+    merged = []
+    total_length = 0
+    for i, res in enumerate(results):
+        feature = res["features"][0]
+        coords = feature["geometry"]["coordinates"]
+        merged.extend(coords if i == 0 else coords[1:])
+        total_length += int(feature.get("properties", {}).get("track-length", 0))
+
+    first = results[0]["features"][0]
+    return {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "properties": {**first.get("properties", {}), "track-length": str(total_length)},
+            "geometry": {"type": "LineString", "coordinates": merged},
+        }],
+    }
 
 def create_gpx(route: dict[str, Any]) -> str:
     """
@@ -191,7 +222,7 @@ def path(coordinates: Sequence[Sequence[float]], flag: Literal["m","a"] | None =
     if not isinstance(flag,str) or flag not in ("m", "a"):
         raise ValueError("Unknown flag. Accepted values: 'm', 'a'.")
     elif flag == "m":
-        route = brouter_response(coordinates)
+        route = brouter_parallel(coordinates)
         gpx   = create_gpx(route)
 
         return {
@@ -202,7 +233,7 @@ def path(coordinates: Sequence[Sequence[float]], flag: Literal["m","a"] | None =
         matrix = build_distance_matrix(coordinates)
         order = tsp_solution(matrix)
         ordered_cords = [coordinates[i] for i in order]
-        route = brouter_response(ordered_cords)
+        route = brouter_parallel(ordered_cords)
         gpx = create_gpx(route)
 
         return {
