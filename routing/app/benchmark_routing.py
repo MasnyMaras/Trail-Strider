@@ -2,11 +2,9 @@ import csv
 import statistics
 import time
 
-import requests
-
 import routing
 
-COORDINATES = [ # 10 point route
+COORDINATES = [  # 10 point route
     [19.5579453, 49.6602669],
     [20.3196611, 49.4225336],
     [19.5293392, 49.5730531],
@@ -36,57 +34,71 @@ SUMMARY_CSV = "benchmark_summary.csv"
 SUMMARY_MD = "benchmark_summary.md"
 BENCHMARK_MD = "benchmark.md"
 
-class BrouterTimer:
+class RoutingTimer:
 
     def __init__(self):
         self.profile = None
-        self.last_time = None
-        self._original_get = requests.get
 
     def _timed_get(self, url, params=None, **kwargs):
         params = dict(params or {})
         params["profile"] = self.profile
-        start = time.perf_counter()
-        try:
-            return self._original_get(url, params=params, **kwargs)
-        finally:
-            self.last_time = time.perf_counter() - start
+        return self._original_get(url, params=params, **kwargs)
 
     def __enter__(self):
-        class _RequestsProxy:
+        self._saved_session = routing._session
+        self._original_get = self._saved_session.get
+        timer = self
+
+        class _SessionProxy:
             def __getattr__(_, name):
-                return getattr(requests, name)
+                return getattr(timer._saved_session, name)
 
-            get = staticmethod(self._timed_get)
+            def get(_, *args, **kwargs):
+                return timer._timed_get(*args, **kwargs)
 
-        self._saved = routing.requests
-        routing.requests = _RequestsProxy()
+        routing._session = _SessionProxy()
         return self
 
     def __exit__(self, *exc):
-        routing.requests = self._saved
+        routing._session = self._saved_session
 
-
-def run_once(timer: BrouterTimer):
-    timer.last_time = None
-    return timer
 
 def md_table(header, rows):
     esc = lambda c: str(c).replace("|", "\\|").replace("\n", " ")
-    lines = ["| " + " | ".join(header) + " |",
-             "|" + "|".join(["---"] * len(header)) + "|"]
-    lines += ["| " + " | ".join(esc(c) for c in row) + " |" for row in rows]
+    lines = [
+        "| " + " | ".join(header) + " |",
+        "|" + "|".join(["---"] * len(header)) + "|",
+    ]
+    lines += [
+        "| " + " | ".join(esc(c) for c in row) + " |"
+        for row in rows
+    ]
     return "\n".join(lines)
+
+def stats(values):
+    if not values:
+        return {"mean": None, "std": None}
+
+    return {
+        "mean": statistics.mean(values),
+        "std": statistics.stdev(values) if len(values) > 1 else 0.0,
+    }
+
+
+def fmt(value, digits=3):
+    return f"{value:.{digits}f}" if value is not None else "-"
 
 def main():
     raw_rows = []
     summary = {}
 
-    with BrouterTimer() as timer:
+    with RoutingTimer() as timer:
         total = len(PROFILES) * len(MODES)
         done = 0
+
         for profile in PROFILES:
             timer.profile = profile
+
             for mode in MODES:
                 done += 1
                 print(f"[{done}/{total}] {profile} / {mode}", flush=True)
@@ -97,62 +109,89 @@ def main():
                     except Exception:
                         pass
 
-                times = []
+                totals = []
                 errors = 0
+
                 for run in range(1, REPEATS + 1):
-                    timer.last_time = None
                     status, error = "ok", ""
+                    start = time.perf_counter()
+
                     try:
                         routing.path(COORDINATES, mode)
-                    except Exception as e:
-                        status, error = "error", f"{type(e).__name__}: {e}"
+                    except Exception as exc:
+                        status = "error"
+                        error = f"{type(exc).__name__}: {exc}"
                         errors += 1
-                    elapsed = timer.last_time
 
-                    if status == "ok" and elapsed is not None:
-                        times.append(elapsed)
+                    elapsed = time.perf_counter() - start
+
+                    if status == "ok":
+                        totals.append(elapsed)
 
                     raw_rows.append({
                         "profile": profile,
                         "mode": mode,
                         "run": run,
-                        "brouter_time_s": f"{elapsed:.4f}" if elapsed is not None else "",
+                        "total_time_s": f"{elapsed:.4f}",
                         "status": status,
                         "error": error[:200],
                     })
 
                 summary[(profile, mode)] = {
-                    "mean": statistics.mean(times) if times else None,
-                    "std": statistics.stdev(times) if len(times) > 1 else 0.0 if times else None,
-                    "min": min(times) if times else None,
-                    "max": max(times) if times else None,
-                    "ok": len(times),
+                    "total": stats(totals),
+                    "min": min(totals) if totals else None,
+                    "max": max(totals) if totals else None,
+                    "ok": len(totals),
                     "errors": errors,
                 }
 
+    raw_fields = [
+        "profile",
+        "mode",
+        "run",
+        "total_time_s",
+        "status",
+        "error",
+    ]
+
     with open(RAW_CSV, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["profile", "mode", "run", "brouter_time_s", "status", "error"]
-        )
+        writer = csv.DictWriter(f, fieldnames=raw_fields)
         writer.writeheader()
         writer.writerows(raw_rows)
 
-    def fmt(v):
-        return f"{v:.3f}" if v is not None else "-"
-
+    # Summary: only total-time statistics for each mode.
     header = [
         "profile",
-        "manual mean [s]", "manual std", "manual ok/err",
-        "auto mean [s]", "auto std", "auto ok/err",
+        "manual total mean [s]",
+        "manual std",
+        "manual min",
+        "manual max",
+        "manual ok/err",
+        "auto total mean [s]",
+        "auto std",
+        "auto min",
+        "auto max",
+        "auto ok/err",
     ]
+
     table = []
+
     for profile in PROFILES:
-        m = summary[(profile, "m")]
-        a = summary[(profile, "a")]
+        manual = summary[(profile, "m")]
+        auto = summary[(profile, "a")]
+
         table.append([
             profile,
-            fmt(m["mean"]), fmt(m["std"]), f'{m["ok"]}/{m["errors"]}',
-            fmt(a["mean"]), fmt(a["std"]), f'{a["ok"]}/{a["errors"]}',
+            fmt(manual["total"]["mean"]),
+            fmt(manual["total"]["std"]),
+            fmt(manual["min"]),
+            fmt(manual["max"]),
+            f'{manual["ok"]}/{manual["errors"]}',
+            fmt(auto["total"]["mean"]),
+            fmt(auto["total"]["std"]),
+            fmt(auto["min"]),
+            fmt(auto["max"]),
+            f'{auto["ok"]}/{auto["errors"]}',
         ])
 
     with open(SUMMARY_CSV, "w", newline="", encoding="utf-8") as f:
@@ -160,22 +199,40 @@ def main():
         writer.writerow(header)
         writer.writerows(table)
 
-    md = ["| " + " | ".join(header) + " |",
-          "|" + "|".join(["---"] * len(header)) + "|"]
-    md += ["| " + " | ".join(row) + " |" for row in table]
     with open(SUMMARY_MD, "w", encoding="utf-8") as f:
         f.write(md_table(header, table) + "\n")
 
-    raw_header = ["profile", "mode", "run", "time [s]", "status", "error"]
-    raw_table = [
-        [r["profile"], r["mode"], r["run"], r["brouter_time_s"] or "-",
-         r["status"], r["error"] or "-"]
-        for r in raw_rows
+    # Benchmark Markdown: same reduced columns as the CSV files.
+    raw_header = [
+        "profile",
+        "mode",
+        "run",
+        "total [s]",
+        "status",
+        "error",
     ]
+
+    raw_table = [
+        [
+            row["profile"],
+            row["mode"],
+            row["run"],
+            row["total_time_s"],
+            row["status"],
+            row["error"] or "-",
+        ]
+        for row in raw_rows
+    ]
+
     with open(BENCHMARK_MD, "w", encoding="utf-8") as f:
-        f.write("# Routing benchmark for different profiles, automatic and manual modes.\n\n")
-        f.write(f"Route: {len(COORDINATES)} points, repeats: {REPEATS}, "
-                f"warmup: {WARMUP}\n\n")
+        f.write(
+            "# Routing benchmark for different profiles, "
+            "automatic and manual modes.\n\n"
+        )
+        f.write(
+            f"Route: {len(COORDINATES)} points, repeats: {REPEATS}, "
+            f"warmup: {WARMUP}\n\n"
+        )
         f.write("## Data\n\n")
         f.write(md_table(raw_header, raw_table) + "\n\n")
         f.write("## Summary\n\n")

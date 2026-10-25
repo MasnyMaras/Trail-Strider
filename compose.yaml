@@ -45,8 +45,8 @@ services:
         target: /segments4
         read_only: true
     environment:
-      MAXTHREADS: "2"
-      JAVA_OPTS: "-Xmx128M -Xms128M -Xmn8M -DmaxRunningTime=60 -DuseRFCMimeType=false"
+      MAXTHREADS: "8"
+      JAVA_OPTS: "-Xmx2G -Xms1G -DmaxRunningTime=160 -DuseRFCMimeType=false"
     # brouter config parameters based on: 
     # https://github.com/abrensch/brouter/blob/master/README.md
     # https://zod.github.io/brouter/developers/docker_guide.html
@@ -92,20 +92,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-  frontend:
-    build: ./frontend
-    container_name: trail-strider-frontend-1
-    ports:
-      - "127.0.0.1:5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      - NODE_ENV=development
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
 
 volumes:
   pgdata:
