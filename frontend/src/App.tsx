@@ -161,6 +161,7 @@ export function App() {
                             onClose={() => setIsPreferencesOpen(false)}
                             onSubmit={handlePreferencesSubmit}/>
                         <SaveRoute
+                            key={String(isSaveRouteOpen)}
                             isOpen={isSaveRouteOpen}
                             onClose={() => setIsSaveRouteOpen(false)}
                             daysCount={routePreferences?.days || 0}

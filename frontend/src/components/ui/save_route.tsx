@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, Download, ListChecks, AlertCircle } from "lucide-react";
 
 interface SaveRouteProps {
@@ -10,12 +10,8 @@ interface SaveRouteProps {
 
 export default function SaveRoute({ isOpen, onClose, daysCount, onSave }: SaveRouteProps) {
     const [selectedDays, setSelectedDays] = useState<number[]>([]);
+    const [isSaveError, setIsSaveError] = useState<boolean>(false);
 
-    useEffect(() => {
-        if (isOpen) {
-            setSelectedDays([]);
-        }
-    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -23,16 +19,18 @@ export default function SaveRoute({ isOpen, onClose, daysCount, onSave }: SaveRo
         setSelectedDays(prev =>
             prev.includes(index) ? prev.filter(d => d !== index) : [...prev, index]
         );
+        setIsSaveError(false)
     };
 
     const handleSelectAll = () => {
         const allDays = Array.from({ length: daysCount }).map((_, i) => i);
         setSelectedDays(allDays);
+        setIsSaveError(false)
     };
 
     const handleSave = () => {
         if (daysCount > 0 && selectedDays.length === 0) {
-            alert("Wybierz przynajmniej jeden dzień do zapisu!");
+            setIsSaveError(true)
             return;
         }
         onSave(selectedDays);
@@ -40,28 +38,35 @@ export default function SaveRoute({ isOpen, onClose, daysCount, onSave }: SaveRo
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 p-4 backdrop-blur-sm transition-opacity" onClick={onClose}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 p-4 backdrop-blur-sm transition-opacity">
             <div className="relative flex w-full max-w-sm max-h-[90vh] flex-col rounded-2xl border border-white/50 bg-white/60 p-6 shadow-2xl backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
 
                 <button
                     type="button"
-                    onClick={onClose}
-                    className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/50 text-slate-500 shadow-sm transition-colors hover:bg-white hover:text-slate-800 focus:outline-none"
+                    onClick={() => {
+                        setIsSaveError(false);
+                        onClose();
+                    }}                    className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/50 text-slate-500 shadow-sm transition-colors hover:bg-white hover:text-slate-800 focus:outline-none"
                     title="Zamknij"
                 >
                     <X size={18} />
                 </button>
 
-                <h2 className="mb-6 mt-2 text-center font-['Luckiest_Guy'] text-4xl tracking-wide text-green-700 drop-shadow-sm uppercase">
+                <h2 className="mb-4 mt-2 text-center font-['Luckiest_Guy'] text-4xl tracking-wide text-green-700 drop-shadow-sm uppercase">
                     Zapisz plik GPX
                 </h2>
 
                 {daysCount > 0 ? (
                     <>
                         <div className="mb-6 flex flex-1 flex-col overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-green-700 [&::-webkit-scrollbar-thumb]:rounded-full [scrollbar-width:thin]">
-                            <label className="mb-3 block px-1 text-[15px] font-bold uppercase tracking-wider text-slate-500">
+                            <label className="block px-1 text-[15px] font-bold uppercase tracking-wider text-slate-500">
                                 Wybierz dni do zapisu
                             </label>
+                            {isSaveError && (
+                                <p className="mt-1.5 mb-2 pl-2 text-[15px] font-medium text-red-500">
+                                    minimalna ilość dni 1
+                                </p>
+                            )}
                             <div className="flex flex-col gap-2">
                                 {Array.from({ length: daysCount }).map((_, index) => {
                                     const isChecked = selectedDays.includes(index);
@@ -71,7 +76,7 @@ export default function SaveRoute({ isOpen, onClose, daysCount, onSave }: SaveRo
                                             type="button"
                                             onClick={() => toggleDay(index)}
                                             className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 shadow-sm transition-colors duration-200 ${
-                                                isChecked ? 'border-green-500 bg-white/80' : 'border-white/60 bg-white/40 hover:bg-white/60'
+                                                isChecked ? 'border-green-700 bg-white/80' : 'border-white/60 bg-white/40 hover:bg-white/60'
                                             }`}
                                         >
                                             <span className={`font-['Luckiest_Guy'] text-lg tracking-wide drop-shadow-sm ${isChecked ? 'text-green-700' : 'text-slate-600'}`}>
@@ -79,7 +84,7 @@ export default function SaveRoute({ isOpen, onClose, daysCount, onSave }: SaveRo
                                             </span>
 
                                             <div className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-300 ease-in-out ${
-                                                isChecked ? "bg-green-500" : "bg-slate-300"
+                                                isChecked ? "bg-green-700" : "bg-slate-300"
                                             }`}>
                                                 <span className={`flex h-4 w-4 transform items-center justify-center rounded-full bg-white shadow-sm transition-transform duration-300 ease-in-out ${
                                                     isChecked ? "translate-x-6" : "translate-x-1"
