@@ -5,7 +5,8 @@ import Footer from "@/components/ui/footer"
 import Sidebar from "@/components/ui/sidebar"
 import TrailPreferences from "@/components/ui/trail_preferences"
 import SaveRoute from "@/components/ui/save_route"
-import { useState } from "react";
+import NotFound from "@/components/ui/not_found"
+import { useEffect, useState } from "react";
 import type { RoutePoint } from "@/types/route"
 
 export interface RoutePreferences {
@@ -93,6 +94,7 @@ export function App() {
             return copy
         })
     }
+
     const handlePreferencesSubmit = async (preferencesData: RoutePreferences) => {
         setRoutePreferences(preferencesData);
         setIsPreferencesOpen(false);
@@ -103,41 +105,66 @@ export function App() {
         alert(`Pobieranie GPX.`);
     };
 
+    const [currentPath, setCurrentPath] = useState(
+        () => window.location.pathname.replace(/\/+$/, "") || "/"
+    );
+    useEffect(() => {
+        const handleLocationChange = () => {
+            setCurrentPath(
+                window.location.pathname.replace(/\/+$/, "") || "/"
+            );
+        };
+        window.addEventListener("popstate", handleLocationChange);
+
+        return () => {
+            window.removeEventListener("popstate", handleLocationChange);
+        };
+    }, []);
+
+    const isNotFoundView = currentPath !== "/";
+    const handleGoHome = () => {
+        window.history.pushState({}, "", "/");
+        setCurrentPath("/");
+    };
+
     return (
         <div className="flex min-h-screen flex-col overflow-hidden bg-slate-50">
             <Header />
             <main className="relative flex-1 w-full h-full">
-                <MapView
-                    isSidebarOpen={isSidebarOpen}
-                    points={points}
-                    onAddPoint={handleAddPoint}
-                    onRemovePoint={handleRemovePoint}/>
-                <Sidebar
-                    isOpen={isSidebarOpen}
-                    onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-                    points={points}
-                    onAddStop={handleAddStop}
-                    onRemoveStop={handleRemovePoint}
-                    onUpdatePointValue={handleUpdatePointValue}
-                    onReorderPoints={setPoints}
-                    isAutoMode={isAutoMode}
-                    onAutoModeToggle={setIsAutoMode}
-                    onOpenPreferences={() => setIsPreferencesOpen(true)}
-                    onOpenSaveRoute={() => setIsSaveRouteOpen(true)}
-                    routePreferences={routePreferences}
-                    routeStats={routeStats}
-                />
-                <TrailPreferences
-                    isOpen={isPreferencesOpen}
-                    onClose={() => setIsPreferencesOpen(false)}
-                    onSubmit={handlePreferencesSubmit}
-                />
-                <SaveRoute
-                    isOpen={isSaveRouteOpen}
-                    onClose={() => setIsSaveRouteOpen(false)}
-                    daysCount={routePreferences?.days || 0}
-                    onSave={handleSaveGpx}
-                />
+                {isNotFoundView ? (
+                    <NotFound onGoHome={handleGoHome} />
+                ) : (
+                    <>
+                        <MapView
+                            isSidebarOpen={isSidebarOpen}
+                            points={points}
+                            onAddPoint={handleAddPoint}
+                            onRemovePoint={handleRemovePoint}/>
+                        <Sidebar
+                            isOpen={isSidebarOpen}
+                            onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+                            points={points}
+                            onAddStop={handleAddStop}
+                            onRemoveStop={handleRemovePoint}
+                            onUpdatePointValue={handleUpdatePointValue}
+                            onReorderPoints={setPoints}
+                            isAutoMode={isAutoMode}
+                            onAutoModeToggle={setIsAutoMode}
+                            onOpenPreferences={() => setIsPreferencesOpen(true)}
+                            onOpenSaveRoute={() => setIsSaveRouteOpen(true)}
+                            routePreferences={routePreferences}
+                            routeStats={routeStats}/>
+                        <TrailPreferences
+                            isOpen={isPreferencesOpen}
+                            onClose={() => setIsPreferencesOpen(false)}
+                            onSubmit={handlePreferencesSubmit}/>
+                        <SaveRoute
+                            isOpen={isSaveRouteOpen}
+                            onClose={() => setIsSaveRouteOpen(false)}
+                            daysCount={routePreferences?.days || 0}
+                            onSave={handleSaveGpx}/>
+                    </>
+                )}
                 <Footer />
             </main>
         </div>
