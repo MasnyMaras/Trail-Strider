@@ -17,6 +17,9 @@ interface SidebarProps {
     onOpenSaveRoute: () => void;
     routePreferences: RoutePreferences | null;
     routeStats?: DayStat[] | null;
+    onCalculateRoute: () => void;
+    isRouteLoading: boolean;
+    routeError: string | null;
 }
 
 export default function Sidebar({
@@ -32,7 +35,10 @@ export default function Sidebar({
                                 onOpenPreferences,
                                 onOpenSaveRoute,
                                 routePreferences,
-                                routeStats
+                                routeStats,
+                                onCalculateRoute,
+                                isRouteLoading,
+                                routeError,
 }: SidebarProps) {
 
 
@@ -208,6 +214,19 @@ export default function Sidebar({
                             </div>
                         );
                     })}
+
+                    <button
+                        onClick={onCalculateRoute}
+                        disabled={isRouteLoading}
+                        className="group relative mt-4 flex h-11 w-full shrink-0 items-center justify-center overflow-hidden rounded-full bg-green-700 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-800 disabled:cursor-wait disabled:opacity-60"
+                    >
+                        {isRouteLoading ? "Wyznaczanie trasy..." : "Wyznacz trasę"}
+                    </button>
+                    {routeError && (
+                        <p className="mt-2 px-2 text-center text-xs font-medium text-red-500">
+                            {routeError}
+                        </p>
+                    )}
 
                     <button
                         onClick={onOpenPreferences}

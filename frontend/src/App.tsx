@@ -7,8 +7,10 @@ import TrailPreferences from "@/components/ui/trail_preferences"
 import SaveRoute from "@/components/ui/save_route"
 import NotFound from "@/components/ui/not_found"
 import SearchBar from "@/components/ui/search_bar";
+import ElevationProfile from "@/components/ui/elevation_profile.tsx";
+import { calculateRoute } from "@/api/routes"
 import { useEffect, useState } from "react";
-import type { RoutePoint } from "@/types/route"
+import type { RoutePoint, RouteResponse } from "@/types/route"
 
 export interface RoutePreferences {
     difficulty: number;
@@ -28,6 +30,9 @@ export function App() {
     const [routePreferences, setRoutePreferences] = useState<RoutePreferences | null>(null)
     const [routeStats, setRouteStats] = useState<DayStat[] | null>(null)
     const [isSaveRouteOpen, setIsSaveRouteOpen] = useState(false)
+    const [routeResponse, setRouteResponse] = useState<RouteResponse | null>(null)
+    const [routeError, setRouteError] = useState<string | null>(null)
+    const [isRouteLoading, setIsRouteLoading] = useState(false)
 
     const [points, setPoints] = useState<RoutePoint[]>([
         { id: "start-initial", value: "" },
@@ -106,6 +111,37 @@ export function App() {
         alert(`Pobieranie GPX.`);
     };
 
+    const handleCalculateRoute = async () => {
+        const coordinates = points
+            .map((point) => point.coordinates)
+            .filter((coordinate): coordinate is [number, number] => coordinate !== undefined)
+
+        if (coordinates.length < 2) {
+            setRouteError("Wybierz co najmniej dwa punkty trasy.")
+            return
+        }
+
+        setIsRouteLoading(true)
+        setRouteError(null)
+
+        try {
+            const response = await calculateRoute({
+                points: coordinates,
+                mode: isAutoMode ? "a" : "m",
+            })
+            setRouteResponse(response)
+        } catch (error) {
+            setRouteResponse(null)
+            setRouteError(
+                error instanceof Error
+                    ? error.message
+                    : "Nie udało się wyznaczyć trasy.",
+            )
+        } finally {
+            setIsRouteLoading(false)
+        }
+    }
+
     const [currentPath, setCurrentPath] = useState(
         () => window.location.pathname.replace(/\/+$/, "") || "/"
     );
@@ -132,7 +168,17 @@ export function App() {
         <div className="flex min-h-screen flex-col overflow-hidden bg-slate-50">
             <Header />
             <main className="relative flex-1 w-full h-full">
-                {isNotFoundView ? (
+                {/*Developer mode for debugging single component*/}
+                {currentPath === "/dev" ? (
+                    <div className="flex h-full w-full items-center justify-center p-8 bg-slate-100">
+                        <div className="w-full max-w-2xl">
+                            <h2 className="mb-4 text-xl font-bold text-slate-800">Podgląd Developerski</h2>
+                            {/*Debug any component */}
+                            <ElevationProfile data={routeResponse?.elevation_profile} />
+                        </div>
+                    </div>
+                //================================
+                ) : isNotFoundView ? (
                     <NotFound onGoHome={handleGoHome} />
                 ) : (
                     <>
@@ -155,7 +201,10 @@ export function App() {
                             onOpenPreferences={() => setIsPreferencesOpen(true)}
                             onOpenSaveRoute={() => setIsSaveRouteOpen(true)}
                             routePreferences={routePreferences}
-                            routeStats={routeStats}/>
+                            routeStats={routeStats}
+                            onCalculateRoute={handleCalculateRoute}
+                            isRouteLoading={isRouteLoading}
+                            routeError={routeError}/>
                         <TrailPreferences
                             isOpen={isPreferencesOpen}
                             onClose={() => setIsPreferencesOpen(false)}
