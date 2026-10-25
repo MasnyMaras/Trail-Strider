@@ -1,6 +1,7 @@
 import { useState} from "react";
-import { ChevronLeft, ChevronRight, Download, Plus, Menu, X, Route } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Plus, Menu, X, Route,ChevronDown, ChevronUp } from "lucide-react";
 import type { RoutePoint } from "@/types/route";
+import type { RoutePreferences, DayStat } from "@/App";
 
 interface SidebarProps {
     isOpen: boolean;
@@ -13,6 +14,9 @@ interface SidebarProps {
     isAutoMode: boolean;
     onAutoModeToggle: (newState: boolean) => void;
     onOpenPreferences: () => void;
+    onOpenSaveRoute: () => void;
+    routePreferences: RoutePreferences | null;
+    routeStats?: DayStat[] | null;
 }
 
 export default function Sidebar({
@@ -26,6 +30,9 @@ export default function Sidebar({
                                 isAutoMode,
                                 onAutoModeToggle,
                                 onOpenPreferences,
+                                onOpenSaveRoute,
+                                routePreferences,
+                                routeStats
 }: SidebarProps) {
 
 
@@ -67,11 +74,14 @@ export default function Sidebar({
         onAutoModeToggle(newState);
         /*alert(`Tryb automatyczny: ${newState ? "włączony" : "wyłączony"}`);*/
     };
-    const handlePlaceholderClick = () => {
-        console.log("[Sidebar] Action button clicked");
-        alert("Zapisano trase");
+    const [expandedDays, setExpandedDays] = useState<number[]>([]);
+    const toggleDay = (index: number) => {
+        setExpandedDays(prev =>
+            prev.includes(index)
+                ? prev.filter(dayIndex => dayIndex !== index)
+                : [...prev, index]
+        );
     };
-
     return (
         <aside
             className={`absolute right-0 top-20 bottom-20 z-20 flex w-64 flex-col rounded-l-2xl border border-white/50 bg-white/30 shadow-lg backdrop-blur-md transition-transform duration-300 ease-in-out md:right-4 md:top-20 md:bottom-15 md:w-80 md:rounded-2xl lg:w-120 ${
@@ -198,6 +208,7 @@ export default function Sidebar({
                             </div>
                         );
                     })}
+
                     <button
                         onClick={onOpenPreferences}
                         className="group relative mt-6 shrink-0 flex h-10 w-full items-center overflow-hidden rounded-full bg-white border border-white/60 text-xs font-medium text-slate-800 shadow-sm transition-colors duration-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-700 focus:ring-offset-2 md:h-11 md:text-sm"
@@ -211,20 +222,72 @@ export default function Sidebar({
                             </div>
                         </div>
                     </button>
+
+                    <div className="my-4 flex min-h-[100px] w-full shrink-0 items-center justify-center rounded-xl bg-white/40 p-4 shadow-sm backdrop-blur-sm">
+                        <span className="text-sm font-bold text-slate-700">Wykres wysokościowy całej trasy</span>
+                    </div>
+
+                    {routePreferences && routePreferences.days > 0 && (
+                        <div className="mt-2 mb-4 flex w-full flex-col gap-2 shrink-0">
+                            {Array.from({ length: routePreferences.days }).map((_, index) => {
+                                const isExpanded = expandedDays.includes(index);
+                                const backendDistance = routeStats?.[index]?.distance;
+                                const backendTime = routeStats?.[index]?.time;
+                                return (
+                                    <div key={index} className="flex w-full flex-col overflow-hidden rounded-xl border border-white/60 bg-white/60 shadow-sm backdrop-blur-sm transition-all duration-300">
+
+                                        <button
+                                            onClick={() => toggleDay(index)}
+                                            className="flex w-full items-center justify-between px-4 py-3 hover:bg-white/80 transition-colors focus:outline-none"
+                                        >
+                                            <span className="font-['Luckiest_Guy'] text-lg tracking-wide text-green-700 drop-shadow-sm">
+                                                Dzień {index + 1}
+                                            </span>
+                                            <div className="text-slate-400 transition-transform duration-300">
+                                                {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                            </div>
+                                        </button>
+
+                                        <div className={`transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0'}`}>
+                                            <div className="flex flex-col gap-2 px-4 pb-4 pt-1">
+
+                                                <div className="flex w-full items-center justify-between px-1 text-xs md:text-[15px] font-semibold text-slate-600">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-slate-400">Dystans:</span>
+                                                        <span>{backendDistance !== undefined && backendDistance !== null ? `${backendDistance} km` : "X km"}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-slate-400">Czas:</span>
+                                                        <span>{backendTime ? `${backendTime} h` : "X h"}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex min-h-[80px] w-full items-center justify-center rounded-lg border-2  border-slate-300 bg-white/50 p-2">
+                                                    <span className="text-center text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                                        wykres wysokosciowy dnia
+                                                    </span>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
                 </div>
 
+
                 <button
-                    onClick={handlePlaceholderClick}
+                    onClick={onOpenSaveRoute}
                     className="group relative mt-auto flex h-10 w-full items-center overflow-hidden rounded-full bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 shadow-sm transition-colors duration-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-700 focus:ring-offset-2 md:h-11 md:text-sm"
                 >
                     <span className="absolute left-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-green-700 transition-transform duration-700 ease-out group-hover:scale-[250]"></span>
 
                     <div className="relative z-10 flex w-full items-center justify-center gap-2 px-5 transition-all duration-500">
-
                         <span className="w-2 transition-all duration-500 group-hover:w-0 group-hover:-ml-2"></span>
-
-                        <span className="transition-all duration-500">Zapisz Trasę</span>
-
+                        <span className="transition-all duration-500">Zapisz jako GPX</span>
                         <div className="w-0 overflow-hidden opacity-0 transition-all duration-500 group-hover:w-4 group-hover:opacity-100">
                             <Download className="h-4 w-4" />
                         </div>
