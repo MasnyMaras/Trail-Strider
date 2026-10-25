@@ -6,6 +6,7 @@ import Sidebar from "@/components/ui/sidebar"
 import TrailPreferences from "@/components/ui/trail_preferences"
 import SaveRoute from "@/components/ui/save_route"
 import NotFound from "@/components/ui/not_found"
+import SearchBar from "@/components/ui/search_bar";
 import { useEffect, useState } from "react";
 import type { RoutePoint } from "@/types/route"
 
@@ -135,6 +136,7 @@ export function App() {
                     <NotFound onGoHome={handleGoHome} />
                 ) : (
                     <>
+                        <SearchBar isSidebarOpen={isSidebarOpen} />
                         <MapView
                             isSidebarOpen={isSidebarOpen}
                             points={points}
