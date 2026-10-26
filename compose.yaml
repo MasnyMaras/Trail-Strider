@@ -46,7 +46,7 @@ services:
         read_only: true
     environment:
       MAXTHREADS: "8"
-      JAVA_OPTS: "-Xmx2G -Xms1G -DmaxRunningTime=160 -DuseRFCMimeType=false"
+      JAVA_OPTS: "-Xmx2G -Xms1G -DmaxRunningTime=10 -DuseRFCMimeType=false"
     # brouter config parameters based on: 
     # https://github.com/abrensch/brouter/blob/master/README.md
     # https://zod.github.io/brouter/developers/docker_guide.html

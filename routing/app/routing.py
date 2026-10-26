@@ -69,7 +69,7 @@ def tsp_solution(distance_matrix: np.ndarray) -> list[int]:
     search_parameters.local_search_metaheuristic = (
         routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
     )
-    search_parameters.time_limit.seconds = 5
+    search_parameters.time_limit.seconds = 1
 
     solution = routing.SolveWithParameters(search_parameters)
     if solution is None:
@@ -100,11 +100,11 @@ def brouter_response(coordinates: Sequence[Sequence[float]]) -> dict[str, Any]:
         BROUTER_URL,
         params={
             "lonlats": f"{points}",
-            "profile": "hiking-mountain",
+            "profile": "shortest",
             "alternativeidx": 0,
             "format": "geojson",
         },
-        timeout = 160,
+        timeout = 10,
     )
     response.raise_for_status()
     return response.json()
