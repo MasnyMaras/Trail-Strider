@@ -10,9 +10,9 @@ przeglądarka / curl ──► backend ──► db       (PostgreSQL + PostGIS)
 Endpointy na tym etapie:
 - `GET /api/health` – czy backend działa,
 - `GET /api/health/db` – czy działa połączenie z bazą,
-- `POST /api/route` – wyznaczenie trasy przez routing (na razie zwraca odpowiedź routingu bez zmian).
+- `POST /api/route` – wyznaczenie trasy przez routing i noclegi w pobliżu trasy (z tabeli `app.noclegi`).
 
-**Wymagania:** wykonane w całości `docs/SETUP.md`, `docs/BROUTER.md` i `docs/ROUTING.md`.
+**Wymagania:** wykonane w całości `docs/SETUP.md` (łącznie z Krokiem 15 – tabela `app.noclegi`), `docs/BROUTER.md` i `docs/ROUTING.md`.
 
 **Zasady:**
 - Każdy krok: **Sprawdź przed → Wykonaj → Sprawdź po.**
@@ -89,12 +89,31 @@ To dokumentacja API generowana automatycznie z kodu; przycisk **Try it out → E
 
 **`POST /api/route`** – treść zapytania (JSON), taka sama jak w routingu:
 ```json
-{"points": [[20.94498, 50.06465], [20.93658, 50.06143]], "mode": "m"}
+{"points": [[20.94498, 50.06465], [20.93658, 50.06143]], "mode": "m", "buffer_m": 1000}
 ```
 - `points` – co najmniej 2 punkty, każdy **`[lon, lat]`**,
-- `mode` – `"m"` ręczny (domyślny), `"a"` automatyczny (jeszcze niezaimplementowany).
+- `mode` – `"m"` ręczny (domyślny), `"a"` automatyczny,
+- `buffer_m` – opcjonalny: noclegi do tej odległości od trasy, w metrach (domyślnie `1000`, zakres `0`–`5000`).
 
-Odpowiedź (tymczasowo – bez przetwarzania): `{"json": <GeoJSON trasy>, "gpx": "<tekst GPX>"}`.
+Odpowiedź: `{"json": <GeoJSON trasy>, "gpx": "<tekst GPX>", "lodgings": [<noclegi>]}`.
+Trasa liczona jest raz – noclegi wyszukiwane są wzdłuż tej samej geometrii.
+
+`lodgings` – noclegi w odległości do `buffer_m` od trasy, posortowane wzdłuż trasy (`route_km`, potem `distance_m`):
+
+| pole | znaczenie |
+|---|---|
+| `source` | `osm`, `lp` (Lasy Państwowe), `zanocuj` (punkty „Zanocuj w lesie”) |
+| `type` | `pole_namiotowe`, `miejsce_biwakowe`, `schronisko`, `chatka`, `hostel`, `kwatera`, `hotel`, `zanocuj_w_lesie` |
+| `name` | nazwa (może być `null`) |
+| `preferred` | `true` – punkt „Zanocuj w lesie” do 200 m od wody (preferowany przy wyborze noclegu) |
+| `water_type`, `water_distance_m` | najbliższa woda (tylko `zanocuj`): `zrodlo`, `zbiornik`, `rzeka`, `strumien` i odległość w m |
+| `website`, `phone` | kontakt z OSM (może być `null`) |
+| `lon`, `lat` | położenie noclegu |
+| `distance_m` | odległość od trasy [m] |
+| `route_km` | kilometr trasy najbliższy noclegowi (nocleg przed startem lub za metą dostaje km startu / mety) |
+
+Przykład (trasa przez Tarnów, `buffer_m: 1000`): 14 noclegów, m.in.
+`{"source": "osm", "type": "hostel", "name": "Pod Murami Dom Wycieczkowy", "distance_m": 397, "route_km": 0.84, ...}`.
 
 | kod | kiedy | `detail` |
 |---|---|---|
@@ -103,7 +122,9 @@ Odpowiedź (tymczasowo – bez przetwarzania): `{"json": <GeoJSON trasy>, "gpx":
 | 422 | zły format JSON | opis błędu (FastAPI) |
 | 501 | tryb `"a"` | `Automatic mode not yet implemented.` |
 | 502 | awaria BRoutera lub routingu | `route service unavailable` (szczegóły w `docker compose logs backend`) |
+| 502 | odpowiedź routingu bez geometrii trasy | `invalid route from routing service` |
 | 503 | routing nie odpowiada (kontener wyłączony) | `routing unavailable` |
+| 503 | baza nie działa albo brak tabeli `app.noclegi` | `database unavailable` / `lodgings unavailable: run db/sql/noclegi.sql` |
 | 504 | przekroczony czas wyznaczania trasy | `route calculation timed out` |
 
 ---
@@ -172,6 +193,7 @@ diff backend/requirements.txt routing/requirements.txt
 | `app/main.py` | endpointy API: `/api/health`, `/api/health/db`, `/api/route` |
 | `app/db.py` | połączenie z bazą: pula połączeń SQLAlchemy (sterownik psycopg), dane logowania ze zmiennych `PG...` |
 | `app/routing_client.py` | wywołanie usługi routingu (`POST /route`) i tłumaczenie jej błędów na kody dla frontu |
+| `app/lodgings.py` | wyszukiwanie noclegów w pasie wokół trasy (zapytanie do `app.noclegi`) |
 | `app/__init__.py` | pusty – oznacza, że `app` to pakiet Pythona |
 | `Dockerfile` | przepis na obraz (Python 3.12, przypięty digestem) |
 | `requirements.in` | biblioteki wybrane świadomie: `fastapi`, `fastapi-cli`, `sqlalchemy`, `psycopg[binary]`, `requests` |

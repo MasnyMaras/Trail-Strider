@@ -1,3 +1,4 @@
+
 # SETUP – środowisko bazy danych OSM (Trail-Strider, folder `db/`)
 Instrukcja prowadzi od czystego Ubuntu do działającej bazy PostgreSQL + PostGIS
 z danymi OpenStreetMap i skryptów generujących przykładowe mapy (PNG).
@@ -782,3 +783,45 @@ Punkty leżą na drogach i ścieżkach wewnątrz obszarów; super punkty – tu�
 
 ℹ️ Woda pochodzi z OSM: część małych strumieni i źródeł w lasach nie jest zmapowana, więc brak super
 punktu nie oznacza braku wody.
+
+
+---
+
+## Krok 15. Wspólna tabela noclegów (`app.noclegi`)
+
+Backend szuka noclegów przy trasie w jednej tabeli `app.noclegi`. Skrypt `db/sql/noclegi.sql` buduje ją z trzech źródeł
+i ujednolica rodzaje:
+
+| źródło (`zrodlo`) | skąd | rodzaje (`rodzaj`) |
+|---|---|---|
+| `osm` | `points`, `polygons` (obrys → punkt w środku) | `pole_namiotowe`, `miejsce_biwakowe`, `schronisko`, `chatka`, `hostel`, `kwatera`, `hotel` |
+| `lp` | `bdl.noclegi_powierzchniowe`, `bdl.noclegi_kubaturowe` | `miejsce_biwakowe`, `pole_namiotowe`, `schronisko`, `kwatera` |
+| `zanocuj` | `bdl.zanocuj_punkty` (Krok 14) | `zanocuj_w_lesie` (z `super` i odległością wody) |
+
+Wiaty (`amenity=shelter`) są pominięte – w OSM to głównie zadaszenia w parkach i przy szlakach, a nie miejsca noclegowe.
+
+⚠️ Tabela jest kopią danych. **Po każdej zmianie danych źródłowych** (import OSM, `bdl_load.py`, `zanocuj_punkty.sql`)
+uruchom ten skrypt ponownie.
+
+**Sprawdź przed:**
+```bash
+docker compose exec db psql -U osm -d osm -P pager=off -c "SELECT count(*) FROM bdl.zanocuj_punkty;"
+```
+
+**Wymagane:** `309` (Krok 14 wykonany).
+
+**Wykonaj:**
+```bash
+docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/noclegi.sql
+```
+
+**Wymagane (końcówka wyniku):**
+| tabelka | musi pokazać |
+|---|---|
+| `INSERT` | `INSERT 0 3251` (OSM), `INSERT 0 517` (LP), `INSERT 0 309` (zanocuj) |
+| podsumowanie | 12 wierszy; `osm`: `kwatera 1957`, `hotel 908`, `hostel 202`, `pole_namiotowe 108`, `schronisko 44`, `chatka 19`, `miejsce_biwakowe 13`; `lp`: `miejsce_biwakowe 318`, `kwatera 188`, `pole_namiotowe 7`, `schronisko 4`; `zanocuj`: `zanocuj_w_lesie 309` |
+| ostatnia linia | `COMMIT` |
+
+Przy ponownym uruchomieniu komunikat `schema "app" already exists, skipping` jest normalny.
+
+❌ `ERROR` – zatrzymaj się i zgłoś (baza zostaje bez zmian, skrypt działa w jednej transakcji).
