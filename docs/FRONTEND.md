@@ -1,32 +1,4 @@
 # FRONTEND – aplikacja kliencka (React + Vite, folder `frontend/`)
-Instrukcja uruchamia frontend projektu: aplikację jednostronicową (SPA) w React + TypeScript (zbudowaną przy użyciu Vite) w kontenerze Dockera.
-Frontend komunikuje się z backendem za pośrednictwem wbudowanego w Vite mechanizmu reverse proxy.
-
-```
-przeglądarka (localhost:5173) ──► frontend (Vite dev server)
-                                         │
-                         proxy: /api ────┴──► backend:8000 ──► routing / db
-```
-
-Wszystkie zapytania wysyłane w kodzie Reacta do ścieżek relatywnych `/api/...` są automatycznie przekazywane wewnątrz sieci Dockera do kontenera `backend:8000`, co całkowicie eliminuje problem CORS i nie wymaga definiowania adresów IP na sztywno.
-
-
-**Wymagania:** wykonane w całości `docs/SETUP.md`, `docs/BROUTER.md`, `docs/ROUTING.md` oraz `docs/BACKEND.md` (usługi `db`, `brouter`, `routing` i `backend` działają i są zdrowe).
-
-**Zasady:**
-- Każdy krok: **Sprawdź przed → Wykonaj → Sprawdź po.**
-- Wynik musi się zgadzać z tabelą „Wymagane”. Jeśli nie – **zatrzymaj się** i zgłoś, nie idź dalej.
-- Wszystkie komendy wykonujesz w głównym katalogu projektu (`~/Trail-Strider` lub Twojej ścieżce projektu).
-
-
-Masz 100% racji! Bardzo celna uwaga.
-
-Instrukcje w docs/ (tak jak BACKEND.md czy ROUTING.md) są pisane dla członków zespołu, którzy robią git pull i te pliki już mają w repozytorium. Nie tworzą ich od zera za pomocą cat << EOF, tylko od razu sprawdzają, czy pliki są na dysku, a potem odpalają docker compose up -d --build frontend.
-
-Poniżej masz zaktualizowany, ostateczny plik docs/FRONTEND.md, napisany dokładnie według tej zasady (możesz kliknąć przycisk „Copy” w prawym górnym rogu bloku):
-code Markdown
-
-# FRONTEND – aplikacja kliencka (React + Vite, folder `frontend/`)
 Instrukcja uruchamia frontend projektu: aplikację jednostronicową (SPA) w React + TypeScript (zbudowaną przy użyciu Vite) w kontenerze Dockera, w trybie deweloperskim z obsługą Hot Module Replacement (HMR).
 Frontend komunikuje się z backendem za pośrednictwem wbudowanego w Vite mechanizmu reverse proxy.
 
