@@ -146,12 +146,17 @@ def brouter_parallel(coordinates: Sequence[Sequence[float]], max_workers: int = 
         }],
     }
 
-def create_gpx(route: dict[str, Any]) -> str:
+def create_gpx(route: dict[str, Any], splits: Sequence[int] | None = None,
+               waypoints: Sequence[dict[str, Any]] | None = None, track_name: str = "day") -> str:
     """
     Converts GeoJSON route to GPX format. Does not save it as a file, but returns it as a dictionary instead.
 
     Args:
         route (dict): GeoJSON with the generated path.
+        splits (list, optional): indices of route points where a day ends. Each one is the last
+            point of one <trk> and the first point of the next. None means a single track.
+        waypoints (list, optional): dicts with "lat", "lon" and optional "name" (e.g. lodgings).
+        track_name (str): prefix of track names, used only when the route is split.
     Returns:
         str: generated path in GPX format.
     """
@@ -170,22 +175,23 @@ def create_gpx(route: dict[str, Any]) -> str:
     gpx = gpxpy.gpx.GPX()
     gpx.creator = "Trail-Strider"
 
-    track = gpxpy.gpx.GPXTrack()
-    gpx.tracks.append(track)
+    points = [
+        gpxpy.gpx.GPXTrackPoint(latitude=c[1], longitude=c[0], elevation=c[2] if len(c) > 2 else None)
+        for c in coordinates
+    ]
 
-    segment = gpxpy.gpx.GPXTrackSegment()
-    track.segments.append(segment)
+    last = len(points) - 1
+    cuts = sorted({int(s) for s in (splits or []) if 0 < s < last})
+    bounds = [0, *cuts, last]
 
-    for coord in coordinates:
-        lon, lat = coord[:2]
-        elevation = coord[2] if len(coord) > 2 else None
+    for day, (a, b) in enumerate(zip(bounds[:-1], bounds[1:]), start=1):
+        track = gpxpy.gpx.GPXTrack(name=f"{track_name} {day}" if cuts else None)
+        track.segments.append(gpxpy.gpx.GPXTrackSegment(points=points[a:b + 1]))
+        gpx.tracks.append(track)
 
-        point = gpxpy.gpx.GPXTrackPoint(
-            latitude=lat,
-            longitude=lon,
-            elevation=elevation,
-        )
-        segment.points.append(point)
+    for i, w in enumerate(waypoints or [], start=1):
+        gpx.waypoints.append(gpxpy.gpx.GPXWaypoint(
+            latitude=w["lat"], longitude=w["lon"], name=w.get("name") or f"Nocleg {i}"))
 
     return gpx.to_xml()
 
@@ -199,6 +205,7 @@ def path(coordinates: Sequence[Sequence[float]], flag: Literal["m","a"] | None =
     Returns:
         dict:
             {
+                "waypoints": input coordinates (if in auto mode - in optimized order),
                 "json": GeoJSON including generated path.
                 "gpx": generated path in GPX format.
             }
@@ -226,6 +233,7 @@ def path(coordinates: Sequence[Sequence[float]], flag: Literal["m","a"] | None =
         gpx   = create_gpx(route)
 
         return {
+            "waypoints": coordinates,
             "json": route,
             "gpx":  gpx,
         }
@@ -237,6 +245,7 @@ def path(coordinates: Sequence[Sequence[float]], flag: Literal["m","a"] | None =
         gpx = create_gpx(route)
 
         return {
+            "waypoints": ordered_cords,
             "json": route,
             "gpx": gpx,
         }
