@@ -11,31 +11,12 @@ from concurrent.futures import ThreadPoolExecutor
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 
+from app.utils.utils import t_din33466, calculate_route_profile, build_distance_matrix
+
 _session = requests.Session()
 _session.mount("http://", HTTPAdapter(pool_connections=1, pool_maxsize=8))
 
 BROUTER_URL = os.getenv("BROUTER_URL", "http://brouter:17777/brouter")
-
-def build_distance_matrix(coordinates: Sequence[Sequence[float]]) -> np.ndarray :
-    """
-    Builds a pairwise distance matrix using the Haversine formula.
-
-    Args:
-        coordinates (list, array_like): list of [lon, lat] points in DD (Decimal Degrees) form.
-    Returns:
-        np.ndarray: distance matrix for combinations between given coordinates.
-    """
-    coords = np.asarray(coordinates)
-    lon = np.radians(coords[:, 0])
-    lat = np.radians(coords[:, 1])
-    dlon = lon[:, None] - lon[None, :]
-    dlat = lat[:, None] - lat[None, :]
-
-    a = (np.sin(dlat / 2.0) ** 2+ np.cos(lat[:, None])* np.cos(lat[None, :])* np.sin(dlon / 2.0) ** 2)
-    a = np.clip(a, 0.0, 1.0)
-
-    earth_radius_m = 6371000.0
-    return 2.0 * earth_radius_m * np.arcsin(np.sqrt(a))
 
 def tsp_solution(distance_matrix: np.ndarray) -> list[int]:
     """
@@ -229,25 +210,41 @@ def path(coordinates: Sequence[Sequence[float]], flag: Literal["m","a"] | None =
     if not isinstance(flag,str) or flag not in ("m", "a"):
         raise ValueError("Unknown flag. Accepted values: 'm', 'a'.")
     elif flag == "m":
-        route = brouter_parallel(coordinates)
-        gpx   = create_gpx(route)
-
-        return {
-            "waypoints": coordinates,
-            "json": route,
-            "gpx":  gpx,
-        }
+        pass
     elif flag == "a":
         matrix = build_distance_matrix(coordinates)
         order = tsp_solution(matrix)
-        ordered_cords = [coordinates[i] for i in order]
-        route = brouter_parallel(ordered_cords)
-        gpx = create_gpx(route)
-
-        return {
-            "waypoints": ordered_cords,
-            "json": route,
-            "gpx": gpx,
-        }
+        coordinates = [coordinates[i] for i in order]
     else:
         raise ValueError("Unknown flag. Accepted values: 'm', 'a'.")
+
+    route = brouter_parallel(coordinates)
+
+    coords = np.asarray(route["features"][0]["geometry"]["coordinates"],dtype=float)
+    lengths, ups, downs, elevation = calculate_route_profile(coords)
+
+    coords[:, 2] = elevation
+    route["features"][0]["geometry"]["coordinates"] = coords.tolist()
+
+    total_distance = float(lengths[-1])
+    estimated_time = float(t_din33466(total_distance,float(ups[-1]),float(downs[-1])))
+    time_s = estimated_time * 3600.0
+
+    elevation_profile = [
+        {
+            "distance_meters": float(distance),
+            "elevation_meters": float(height),
+        }
+        for distance, height in zip(lengths, elevation)
+    ]
+
+    gpx = create_gpx(route)
+
+    return {
+        "waypoints": coordinates,
+        "route": route,
+        "elevation_profile": elevation_profile,
+        "total_distance_meters": total_distance,
+        "estimated_duration_seconds": time_s,
+        "gpx": gpx,
+    }
