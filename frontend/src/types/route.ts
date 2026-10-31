@@ -42,6 +42,7 @@ export interface RouteGeoJson {
 }
 
 export interface RouteResponse {
+    waypoints: Coordinates[]
     route: RouteGeoJson
     elevation_profile: ElevationPoint[]
     total_distance_meters: number

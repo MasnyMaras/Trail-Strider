@@ -92,3 +92,40 @@ docker compose logs -f frontend
 - **docker compose up -d frontend**: uruchom (uruchomi też backend, bazę, routing i BRouter, jeśli nie działają)
 - **docker compose stop frontend**: zatrzymaj sam frontend
 - **docker compose logs -f frontend**: logi Vite na żywo (Ctrl+C kończy podgląd, nie zatrzymuje kontenera)
+
+
+---
+
+## Zmiana bibliotek frontu (`package.json` / `package-lock.json`)
+
+⚠️ **Do weryfikacji przez autora frontendu.**
+
+Biblioteki (`node_modules`) są instalowane w obrazie (`npm ci` w `frontend/Dockerfile`) i trzymane w kontenerze
+w **wolumenie anonimowym** (`- /app/node_modules` w `compose.yaml`) – dzięki temu kod z repozytorium
+(`./frontend:/app`) ich nie zasłania. Przy odtwarzaniu kontenera Compose **przejmuje zawartość wolumenu
+anonimowego z poprzedniego kontenera** – samo `--build` zbuduje obraz z nowymi bibliotekami, ale kontener
+dalej będzie widział stare `node_modules`.
+
+**Kiedy:** po `git pull`, jeśli zmienił się `frontend/package.json` lub `frontend/package-lock.json`,
+albo po dodaniu biblioteki.
+
+**Wykonaj:**
+```bash
+docker compose up -d --build -V frontend
+```
+- `--build` – buduje obraz z nowymi bibliotekami (`npm ci`),
+- `-V` (`--renew-anon-volumes`) – tworzy wolumen anonimowy od nowa, zamiast przejmować stary; kontener widzi
+  `node_modules` z nowego obrazu.
+
+**Sprawdź po:**
+```bash
+docker compose exec frontend npm ls --depth=0
+```
+Lista bibliotek pierwszego poziomu z wersjami – musi zgadzać się z `frontend/package.json`.
+
+| objaw | przyczyna | co zrobić |
+|---|---|---|
+| w logach Vite lub w przeglądarce: `Failed to resolve import "..."` po `git pull` | kontener ma stare `node_modules` | `docker compose up -d --build -V frontend` |
+
+ℹ️ Stary wolumen anonimowy zostaje na dysku. Nieużywane wolumeny usuwa `docker volume prune`
+(pyta o potwierdzenie; **nie rusza** wolumenów podpiętych do istniejących kontenerów, np. bazy `pgdata`).

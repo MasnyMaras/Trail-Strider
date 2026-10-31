@@ -122,8 +122,8 @@ def brouter_parallel(coordinates: Sequence[Sequence[float]], max_workers: int = 
         "type": "FeatureCollection",
         "features": [{
             "type": "Feature",
-            "properties": {**first.get("properties", {}), "track-length": str(total_length)},
             "geometry": {"type": "LineString", "coordinates": merged},
+            "properties": {**first.get("properties", {}), "track-length": str(total_length)},
         }],
     }
 
