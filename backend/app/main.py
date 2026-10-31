@@ -1,5 +1,6 @@
 from typing import Literal, Any
 import json
+import logging
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -8,13 +9,17 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from app.db import engine
 from app.lodgings import lodgings_near_route
-from app.routing_client import get_route, get_lodgings
+from app.routing_client import get_route, get_route_FIXME, get_lodgings
 
 
 app = FastAPI(title="Trail-Strider API")
-
+logger = logging.getLogger(__name__)
 
 class RouteRequest(BaseModel):
+    points: list[tuple[float, float]]  # [[lon, lat], ...]
+    mode: Literal["m", "a"] = "m"      # m - manual, a - automatic
+
+class RouteRequestFIXME(BaseModel):
     points: list[tuple[float, float]]  # [[lon, lat], ...]
     mode: Literal["m", "a"] = "m"      # m - manual, a - automatic
     buffer_m: int = Field(1000, ge=0, le=5000)  # noclegi do tej odległości od trasy [m]
@@ -46,6 +51,27 @@ def health_db():
 @app.post("/api/route")
 def plan_route(req: RouteRequest):
     route = get_route(req.points, req.mode)
+    try:
+        feature = route["route"]["features"][0]
+        feature["properties"] = {}
+        feature["geometry"]["coordinates"] = [
+            [lon, lat, round(ele)] for lon, lat, ele in feature["geometry"]["coordinates"]
+        ]
+        route["elevation_profile"] = [
+            {"distance_meters": round(p["distance_meters"]), "elevation_meters": round(p["elevation_meters"])}
+            for p in route["elevation_profile"]
+        ]
+        route["total_distance_meters"] = round(route["total_distance_meters"])
+        route["estimated_duration_seconds"] = round(route["estimated_duration_seconds"])
+    except (KeyError, IndexError, TypeError, ValueError) as e:
+        logger.warning("invalid route from routing: %r", e)
+        raise HTTPException(status_code=502, detail="invalid route from routing service")
+    return route
+
+
+@app.post("/api/route/FIXME")   # TODO: obsluga noclegow bedzie w innym endpoincie, do ktorego front zadaje zapytanie chcac wyznaczenie podzialu na dni, niezalezne od samej trasy /api/route
+def plan_route_FIXME(req: RouteRequestFIXME):
+    route = get_route_FIXME(req.points, req.mode)
     try:
         geojson = route.get("route") or route["json"]   # nowy format ("route") albo dotychczasowy ("json")
         geometry = geojson["features"][0]["geometry"]
