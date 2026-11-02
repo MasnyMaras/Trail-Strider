@@ -1,18 +1,34 @@
 import { useEffect, useRef } from "react"
-import { Map, NavigationControl, setWorkerUrl, Popup, Marker } from "maplibre-gl"
+// import { Map, NavigationControl, setWorkerUrl, Popup, Marker } from "maplibre-gl"    // SEBKUC
+import { Map, NavigationControl, setWorkerUrl, Popup, Marker, type VectorTileSource } from "maplibre-gl" // SEBKUC [mapa-regiony]
 import "maplibre-gl/dist/maplibre-gl.css"
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"
 import { ScaleControl } from "./Scale"
+import { MARTIN_URL, type RegionId } from "./Regions" // SEBKUC [mapa-regiony]
 import type { RoutePoint } from "@/types/route"
 
 setWorkerUrl(maplibreWorkerUrl)
 interface MapViewProps {
     isSidebarOpen: boolean
+    regionId: RegionId // SEBKUC [mapa-regiony]
     points: RoutePoint[]
     onAddPoint: (coords: [number, number], mode: "start" | "end" | "middle") => void
     onRemovePoint: (id: string) => void
 }
-export function MapView({ isSidebarOpen, points, onAddPoint, onRemovePoint }: MapViewProps) {
+
+// SEBKUC
+// export function MapView({ isSidebarOpen, points, onAddPoint, onRemovePoint }: MapViewProps) {
+//     const mapContainerRef = useRef<HTMLDivElement>(null)
+//     const mapRef = useRef<Map | null>(null)
+//     const activeMarkersRef = useRef<Marker[]>([])
+//     const tempMarkerRef = useRef<Marker | null>(null)
+//     const pointsRef = useRef(points)
+//     useEffect(() => {
+//         pointsRef.current = points
+//     }, [points])
+
+// SEBKUC
+export function MapView({ isSidebarOpen, regionId, points, onAddPoint, onRemovePoint }: MapViewProps) { // [mapa-regiony]
     const mapContainerRef = useRef<HTMLDivElement>(null)
     const mapRef = useRef<Map | null>(null)
     const activeMarkersRef = useRef<Marker[]>([])
@@ -21,18 +37,21 @@ export function MapView({ isSidebarOpen, points, onAddPoint, onRemovePoint }: Ma
     useEffect(() => {
         pointsRef.current = points
     }, [points])
+// END SEBKUC
 
     useEffect(() => {
         if (!mapContainerRef.current) return
         if (mapRef.current) return
 
-        const styleUrl =
-            import.meta.env.VITE_MAP_STYLE_URL ||
-            "https://tiles.openfreemap.org/styles/liberty" // only for testing
+        // SEBKUC
+        // const styleUrl =
+        //     import.meta.env.VITE_MAP_STYLE_URL ||
+        //     "https://tiles.openfreemap.org/styles/liberty" // only for testing
 
         const map = new Map({
             container: mapContainerRef.current,
-            style: styleUrl,
+            // style: styleUrl, // SEBKUC
+            style: `${MARTIN_URL}/style/liberty`, // SEBKUC [mapa-regiony]
             center: [19.9449, 49.6091],
             zoom: 9,
         })
@@ -130,6 +149,32 @@ export function MapView({ isSidebarOpen, points, onAddPoint, onRemovePoint }: Ma
             mapRef.current = null
         }
     }, [])
+
+    // SEBKUC [mapa-regiony] pokazanie wybranego regionu i ograniczenie widoku do jego prostokąta
+    useEffect(() => {
+        const map = mapRef.current
+        if (!map) return
+        let active = true
+        const url = `${MARTIN_URL}/${regionId}`
+
+        fetch(url)
+            .then((res) => res.json())
+            .then(({ bounds }) => {
+                if (!active) return
+                map.setMaxBounds(null)
+                // map.fitBounds(bounds, { animate: false })
+                //map.setMaxBounds(bounds)      // to powuje że mapa jest ograniczona ale nie widac calego regionu na najdalszym zoomie
+                map.fitBounds(bounds, { animate: false, padding: { top: 140, bottom: 40, left: 20, right: 20 } }) // miejsce na nagłówek i pasek wyszukiwania
+                map.setMaxBounds(map.getBounds()) // granica = widok całego regionu
+                const showRegion = () => map.getSource<VectorTileSource>("openmaptiles")?.setUrl(url)
+                if (map.isStyleLoaded()) showRegion()
+                else map.once("load", showRegion)
+            })
+            .catch((err) => console.error("Region:", err))
+
+        return () => { active = false }
+    }, [regionId])
+    // END SEBKUC
 
     useEffect(() => {
         const map = mapRef.current
