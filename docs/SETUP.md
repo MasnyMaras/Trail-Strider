@@ -823,6 +823,8 @@ i ujednolica rodzaje:
 | `zanocuj` | `bdl.zanocuj_punkty` (Krok 14) | `zanocuj_w_lesie` (z `super` i odległością wody) |
 
 Wiaty (`amenity=shelter`) są pominięte – w OSM to głównie zadaszenia w parkach i przy szlakach, a nie miejsca noclegowe.
+Duplikaty: biwak z OSM bliżej niż 50 m od biwaku Lasów Państwowych jest usuwany (zostaje wpis Lasów).
+
 
 ⚠️ Tabela jest kopią danych. **Po każdej zmianie danych źródłowych** (import OSM, `bdl_load.py`, `zanocuj_punkty.sql`)
 uruchom ten skrypt ponownie.
@@ -842,8 +844,8 @@ docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/no
 **Wymagane (końcówka wyniku):**
 | tabelka | musi pokazać |
 |---|---|
-| `INSERT` | `INSERT 0 16560` (OSM), `INSERT 0 517` (LP), `INSERT 0 723` (zanocuj) |
-| podsumowanie | 12 wierszy; `osm`: `kwatera 9340`, `hotel 5176`, `pole_namiotowe 914`, `hostel 670`, `schronisko 273`, `chatka 103`, `miejsce_biwakowe 84`; `lp`: `miejsce_biwakowe 318`, `kwatera 188`, `pole_namiotowe 7`, `schronisko 4`; `zanocuj`: `zanocuj_w_lesie 723` |
+| `INSERT` / `DELETE` | `INSERT 0 16560` (OSM), `INSERT 0 517` (LP), `DELETE 18` (duplikaty), `INSERT 0 723` (zanocuj) |
+| podsumowanie | 12 wierszy; `osm`: `kwatera 9340`, `hotel 5176`, `pole_namiotowe 897`, `hostel 670`, `schronisko 273`, `chatka 103`, `miejsce_biwakowe 83`; `lp`: `miejsce_biwakowe 318`, `kwatera 188`, `pole_namiotowe 7`, `schronisko 4`; `zanocuj`: `zanocuj_w_lesie 723` |
 | ostatnia linia | `COMMIT` |
 
 Przy ponownym uruchomieniu komunikat `schema "app" already exists, skipping` jest normalny.

@@ -63,6 +63,14 @@ FROM (
     SELECT 'kubaturowe', id, props, geom FROM bdl.noclegi_kubaturowe
 ) l;
 
+DELETE FROM app.noclegi o
+USING app.noclegi l
+WHERE o.zrodlo = 'osm' AND l.zrodlo = 'lp'
+  AND o.rodzaj IN ('pole_namiotowe', 'miejsce_biwakowe')
+  AND l.rodzaj IN ('pole_namiotowe', 'miejsce_biwakowe')
+  AND ST_DWithin(o.geom, l.geom, 90)
+  AND ST_DWithin(ST_Transform(o.geom, 2180), ST_Transform(l.geom, 2180), 50);
+
 -- zanocuj w lesie
 
 INSERT INTO app.noclegi (zrodlo, zrodlo_id, rodzaj, nazwa, super, woda_rodzaj, woda_odl_m, geom)
