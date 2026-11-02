@@ -20,20 +20,25 @@ engine = create_engine(URL.create(
 
 # --- Drogi samochodowe z podziałem na 3 klasy (do różnej grubości linii) ---
 DROGI = """
-    SELECT geom,
+    WITH w AS MATERIALIZED (   -- granica województwa liczona raz
+        SELECT ST_BuildArea(geom) AS geom FROM boundaries
+        WHERE tags->>'name' = 'województwo małopolskie' AND tags->>'admin_level' = '4'
+    )
+    SELECT l.geom,
            CASE
-             WHEN tags->>'highway' IN ('motorway','motorway_link','trunk','trunk_link',
-                                       'primary','primary_link') THEN 'glowne'
-             WHEN tags->>'highway' IN ('secondary','secondary_link',
-                                       'tertiary','tertiary_link') THEN 'srednie'
+             WHEN l.tags->>'highway' IN ('motorway','motorway_link','trunk','trunk_link',
+                                         'primary','primary_link') THEN 'glowne'
+             WHEN l.tags->>'highway' IN ('secondary','secondary_link',
+                                         'tertiary','tertiary_link') THEN 'srednie'
              ELSE 'lokalne'
            END AS klasa
-    FROM lines
-    WHERE tags->>'highway' IN (
+    FROM lines l, w
+    WHERE l.tags->>'highway' IN (
           'motorway','motorway_link','trunk','trunk_link',
           'primary','primary_link','secondary','secondary_link',
           'tertiary','tertiary_link','unclassified','residential',
           'living_street','service')
+      AND ST_Intersects(l.geom, w.geom)
 """
 
 GRANICA = """

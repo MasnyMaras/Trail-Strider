@@ -374,27 +374,32 @@ git check-ignore -v .env
 
 ---
 
-## Krok 8. Pobranie danych OSM (Małopolska)
+## Krok 8. Pobranie danych OSM (Małopolska, Pomorskie, Rumunia)
 
-Używamy pliku z konkretną datą (stan OSM na 1.10.2026) zamiast `latest` – wszyscy mają identyczne dane.
+Używamy plików z konkretną datą (stan OSM na 1.10.2026) zamiast `latest` – wszyscy mają identyczne dane.
+Rumunia nie ma w Geofabrik podziału na okręgi, więc pobieramy cały kraj (region projektu: okręg Maramureș).
 
 **Sprawdź przed:**
 ```bash
 df -h /
 ```
-**Wymagane:** kolumna `Avail` co najmniej **5G**.
+**Wymagane:** kolumna `Avail` co najmniej **10G**.
 
 **Wykonaj:**
 ```bash
 mkdir -p data
 wget -P data https://download.geofabrik.de/europe/poland/malopolskie-261001.osm.pbf
 wget -P data https://download.geofabrik.de/europe/poland/malopolskie-261001.osm.pbf.md5
+wget -P data https://download.geofabrik.de/europe/poland/pomorskie-261001.osm.pbf
+wget -P data https://download.geofabrik.de/europe/poland/pomorskie-261001.osm.pbf.md5
+wget -P data https://download.geofabrik.de/europe/romania-261001.osm.pbf
+wget -P data https://download.geofabrik.de/europe/romania-261001.osm.pbf.md5
 ```
-Pobieranie trwa kilka minut (193 MB).
+Pobieranie trwa kilka minut (razem ok. 620 MB: Małopolska 193 MB, Pomorskie 113 MB, Rumunia 315 MB).
 
 **Sprawdź po:**
 ```bash
-cd data && md5sum -c malopolskie-261001.osm.pbf.md5; cd ..
+cd data && md5sum -c malopolskie-261001.osm.pbf.md5 pomorskie-261001.osm.pbf.md5 romania-261001.osm.pbf.md5; cd ..
 ls -l data
 git check-ignore -v data/malopolskie-261001.osm.pbf
 ```
@@ -402,11 +407,11 @@ git check-ignore -v data/malopolskie-261001.osm.pbf
 **Wymagane:**
 | komenda | musi pokazać |
 |---|---|
-| `md5sum -c ...` | `malopolskie-261001.osm.pbf: OK` (plik kompletny i nieuszkodzony) |
-| `ls -l data` | `malopolskie-261001.osm.pbf` o rozmiarze **202209422** oraz `.md5` o rozmiarze **61** |
+| `md5sum -c ...` | `malopolskie-261001.osm.pbf: OK`, `pomorskie-261001.osm.pbf: OK`, `romania-261001.osm.pbf: OK` (pliki kompletne i nieuszkodzone) |
+| `ls -l data` | `malopolskie-261001.osm.pbf` o rozmiarze **202209422**, `pomorskie-261001.osm.pbf` (ok. 113 MB), `romania-261001.osm.pbf` (ok. 315 MB) i trzy pliki `.md5` |
 | `git check-ignore -v ...` | `.gitignore:59:/data/	data/malopolskie-261001.osm.pbf` (dane nie trafią do repozytorium) |
 
-❌ `md5sum` pokazuje `FAILED` – usuń pliki z `data/` i pobierz ponownie.
+❌ `md5sum` pokazuje `FAILED` – usuń ten plik (i jego `.md5`) z `data/` i pobierz ponownie.
 
 
 
@@ -497,18 +502,21 @@ docker compose exec db psql -U osm -d osm -P pager=off -c "\dt public.*"
 
 **Wykonaj:**
 ```bash
-time docker compose run --rm osm2pgsql -O flex -S /config/generic.lua /data/malopolskie-261001.osm.pbf
+time docker compose run --rm osm2pgsql -O flex -S /config/generic.lua \
+  /data/malopolskie-261001.osm.pbf /data/pomorskie-261001.osm.pbf /data/romania-261001.osm.pbf
 ```
 - `-O flex -S /config/generic.lua` – tryb importu i plik konfiguracji (`db/osm2pgsql/generic.lua`),
-- `/data/...` – plik danych (`data/...` w głównym folderze); ścieżki są widziane z wnętrza kontenera,
+- `/data/...` – pliki danych (`data/...` w głównym folderze); ścieżki są widziane z wnętrza kontenera,
+- **wszystkie trzy pliki w jednym wywołaniu** – każdy import tworzy tabele OSM od nowa, więc import jednego
+  pliku usunąłby pozostałe regiony,
 - za pierwszym razem Docker pobierze obraz osm2pgsql (ok. 280 MB),
-- import trwa ok. 1,5 minuty.
+- import trwa ok. 3,5 minuty.
 
 **Wymagane (końcówka wyniku):**
 ```
-  Processed 24096182 nodes in ...
-  Processed 3142543 ways in ...
-  Processed 30762 relations in ...
+  Processed 78181461 nodes in ...
+  Processed 9196122 ways in ...
+  Processed 115305 relations in ...
 ...
 osm2pgsql took ...s overall.
 ```
@@ -533,8 +541,8 @@ docker compose exec db psql -U osm -d osm -P pager=off -c "SELECT (SELECT count(
 | komenda | musi pokazać |
 |---|---|
 | `\dt public.*` | 7 tabel: `boundaries`, `lines`, `osm2pgsql_properties`, `points`, `polygons`, `routes`, `spatial_ref_sys` |
-| rozmiar bazy | ok. `1314 MB` (wcześniej 19 MB) |
-| liczba obiektów | `points 1071381`, `lines 938950`, `polygons 2179021`, `routes 2986`, `boundaries 3889` – **co do sztuki** |
+| rozmiar bazy | ok. `4076 MB` (wcześniej 19 MB) |
+| liczba obiektów | `points 3248039`, `lines 2856083`, `polygons 6275615`, `routes 16196`, `boundaries 9857` – **co do sztuki** |
 
 | tabela | co zawiera |
 |---|---|
@@ -543,6 +551,14 @@ docker compose exec db psql -U osm -d osm -P pager=off -c "SELECT (SELECT count(
 | `polygons` | obszary (budynki, lasy, jeziora) |
 | `routes` | trasy, m.in. **szlaki turystyczne** |
 | `boundaries` | granice administracyjne |
+
+Regiony projektu (granice na poziomie `admin_level = 4`):
+```bash
+docker compose exec db psql -U osm -d osm -P pager=off -c "SELECT tags->>'name' AS region, round(ST_Area(ST_Transform(ST_BuildArea(geom), 3035)) / 1e6) AS km2 FROM boundaries WHERE tags->>'admin_level' = '4' AND (tags->>'name' IN ('województwo małopolskie', 'województwo pomorskie') OR tags->>'name' LIKE 'Maramure%');"
+```
+**Wymagane:** 3 wiersze: `województwo małopolskie 15184`, `Maramureș 6304`, `województwo pomorskie 19545`
+(Pomorskie jest większe od oficjalnej powierzchni, bo granica w OSM obejmuje wody Zatoki Gdańskiej).
+Nazwy regionów są dokładnie takie jak w tabeli – z `ș` w `Maramureș` – przydają się w zapytaniach i skryptach.
 
 
 
@@ -609,9 +625,9 @@ python db/scripts/malopolskie_roads.py
 | skrypt | musi pokazać |
 |---|---|
 | `krakow_map.py` | `granica 1`, `drogi 60,178`, `budynki 126,351`, `noclegi 410`, `Zapisano output/krakow.png` |
-| `malopolskie_roads.py` | `(385,313 odcinków dróg)`, `Zapisano output/malopolskie_drogi.png` |
+| `malopolskie_roads.py` | `(380,187 odcinków dróg)`, `Zapisano output/malopolskie_drogi.png` |
 
-Liczby obiektów muszą być **identyczne**. Czasy są orientacyjne (u autora: ok. 4 s na skrypt).
+Liczby obiektów muszą być **identyczne**. Czasy są orientacyjne (u autora: ok. 4 s i 9 s).
 
 **Sprawdź po:** otwórz obrazy:
 ```bash
@@ -761,12 +777,20 @@ docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/za
 - ponowne uruchomienie zastępuje punkty danego województwa (komunikaty `already exists, skipping` są wtedy normalne),
 - trwa kilka sekund.
 
+Następnie to samo dla Pomorskiego:
+```bash
+docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 \
+  -v "wojewodztwo=województwo pomorskie" -f - < db/sql/zanocuj_punkty.sql
+```
+Program „Zanocuj w lesie” działa tylko w Polsce – dla Maramureșu skryptu nie uruchamiamy.
+
 **Wymagane (końcówka wyniku, dane OSM z 1.10.2026 i BDL z 10.10.2026):**
-| tabelka | musi pokazać |
-|---|---|
-| podsumowanie | `obszary 70`, `punkty 309`, `przy_sciezce 309`, `obszary_bez_sciezek 0`, `super 190`, `super_proc 61` |
-| super punkty wg wody | `strumien 183`, `zbiornik 5`, `rzeka 2` |
-| ostatnia linia | `COMMIT` |
+| województwo | podsumowanie | super punkty wg wody |
+|---|---|---|
+| małopolskie | `obszary 70`, `punkty 309`, `przy_sciezce 309`, `obszary_bez_sciezek 0`, `super 190`, `super_proc 61` | `strumien 183`, `zbiornik 5`, `rzeka 2` |
+| pomorskie | `obszary 86`, `punkty 414`, `przy_sciezce 413`, `obszary_bez_sciezek 1`, `super 63`, `super_proc 15` | `zbiornik 30`, `rzeka 21`, `strumien 12` |
+
+Ostatnia linia każdego uruchomienia: `COMMIT`. Razem w tabeli: **723** punkty.
 
 ❌ `ROLLBACK` albo `ERROR` – zatrzymaj się i zgłoś.
 
@@ -808,7 +832,7 @@ uruchom ten skrypt ponownie.
 docker compose exec db psql -U osm -d osm -P pager=off -c "SELECT count(*) FROM bdl.zanocuj_punkty;"
 ```
 
-**Wymagane:** `309` (Krok 14 wykonany).
+**Wymagane:** `723` (Krok 14 wykonany dla obu województw).
 
 **Wykonaj:**
 ```bash
@@ -818,10 +842,28 @@ docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/no
 **Wymagane (końcówka wyniku):**
 | tabelka | musi pokazać |
 |---|---|
-| `INSERT` | `INSERT 0 3251` (OSM), `INSERT 0 517` (LP), `INSERT 0 309` (zanocuj) |
-| podsumowanie | 12 wierszy; `osm`: `kwatera 1957`, `hotel 908`, `hostel 202`, `pole_namiotowe 108`, `schronisko 44`, `chatka 19`, `miejsce_biwakowe 13`; `lp`: `miejsce_biwakowe 318`, `kwatera 188`, `pole_namiotowe 7`, `schronisko 4`; `zanocuj`: `zanocuj_w_lesie 309` |
+| `INSERT` | `INSERT 0 16560` (OSM), `INSERT 0 517` (LP), `INSERT 0 723` (zanocuj) |
+| podsumowanie | 12 wierszy; `osm`: `kwatera 9340`, `hotel 5176`, `pole_namiotowe 914`, `hostel 670`, `schronisko 273`, `chatka 103`, `miejsce_biwakowe 84`; `lp`: `miejsce_biwakowe 318`, `kwatera 188`, `pole_namiotowe 7`, `schronisko 4`; `zanocuj`: `zanocuj_w_lesie 723` |
 | ostatnia linia | `COMMIT` |
 
 Przy ponownym uruchomieniu komunikat `schema "app" already exists, skipping` jest normalny.
 
 ❌ `ERROR` – zatrzymaj się i zgłoś (baza zostaje bez zmian, skrypt działa w jednej transakcji).
+
+
+---
+
+# AKTUALIZACJA (2.11.2026): Pomorskie i Maramureș – dla osób, które mają w bazie samą Małopolskę
+
+Baza obejmuje teraz trzy regiony: Małopolskę, Pomorskie i Rumunię (Maramureș). Jeśli robiłeś SETUP wcześniej,
+masz tylko Małopolskę. Dane Lasów Państwowych (Krok 13) i środowisko Pythona zostają – wykonaj tylko:
+
+1. **Krok 8** – pobierz dwa nowe pliki (Pomorskie, Rumunia) i sprawdź sumy `md5sum` wszystkich trzech.
+2. **Krok 10** – import **wszystkich trzech** plików naraz (stare tabele OSM zostaną zastąpione; ok. 3,5 min).
+   Sprawdź liczby obiektów i trzy regiony w `boundaries`.
+3. **Krok 12** – `krakow_map.py` bez zmian; `malopolskie_roads.py` filtruje teraz granicą województwa
+   (wcześniej brał wszystkie drogi z bazy) – `380,187` odcinków.
+4. **Krok 14** – uruchom `zanocuj_punkty.sql` dla Pomorskiego (Małopolska jest już policzona).
+5. **Krok 15** – przebuduj `app.noclegi` (`noclegi.sql`).
+
+Backend i routing nie wymagają zmian.
