@@ -17,21 +17,22 @@ logger = logging.getLogger(__name__)
 
 class RouteRequest(BaseModel):
     points: list[tuple[float, float]]  # [[lon, lat], ...]
-    mode: Literal["m", "a"] = "m"      # m - manual, a - automatic
+    mode: Literal["m", "a"] = "m"  # m - manual, a - automatic
 
 class RouteRequestFIXME(BaseModel):
     points: list[tuple[float, float]]  # [[lon, lat], ...]
-    mode: Literal["m", "a"] = "m"      # m - manual, a - automatic
+    mode: Literal["m", "a"] = "m" # m - manual, a - automatic
     buffer_m: int = Field(1000, ge=0, le=5000)  # noclegi do tej odległości od trasy [m]
 
 class PlanRequest(BaseModel):
-    path: dict[str, Any]                          # GeoJSON from /api/route
-    waypoints: list[tuple[float, float]]          # [[lon, lat], ...]
-    n: int = Field(ge=1, le=30)                   # number of days
-    tmax: float = Field(gt=0)                     # max time for one fragment [h]
-    beta: float = Field(0.15, ge=0.0, le=0.5)     # safety margin
+    path: dict[str, Any]    # GeoJSON from /api/route
+    waypoints: list[tuple[float, float]]  # [[lon, lat], ...]
+    n: int = Field(ge=1, le=30)    # number of days
+    tmax: float = Field(gt=0)    # max time for one fragment [h]
+    beta: float = Field(0.15, ge=0.0, le=0.5)  # safety margin
     level: Literal["b", "i", "a"] = "i"
     buffer_m: int = Field(1000, ge=0, le=5000)
+    types: list[str] | None = None
 
 @app.get("/api/health")
 def health():
@@ -73,7 +74,7 @@ def plan_route(req: RouteRequest):
 def plan_route_FIXME(req: RouteRequestFIXME):
     route = get_route_FIXME(req.points, req.mode)
     try:
-        geojson = route.get("route") or route["json"]   # nowy format ("route") albo dotychczasowy ("json")
+        geojson = route.get("route") or route["json"]  # nowy format ("route") albo dotychczasowy ("json")
         geometry = geojson["features"][0]["geometry"]
     except (KeyError, IndexError, TypeError, AttributeError):
         raise HTTPException(status_code=502, detail="invalid route from routing service")
@@ -95,7 +96,7 @@ def _route_geometry(geojson: dict) -> dict:
 def plan_lodgings(req: PlanRequest):
     geometry = _route_geometry(req.path)
     try:
-        db_lodgings = lodgings_near_route(geometry, req.buffer_m)
+        db_lodgings = lodgings_near_route(geometry, req.buffer_m, req.types)
     except OperationalError:
         raise HTTPException(status_code=503, detail="database unavailable")
     except ProgrammingError:

@@ -17,11 +17,12 @@ LODGINGS_NEAR_ROUTE = text("""
     FROM app.noclegi n, t
     WHERE ST_DWithin(n.geom, t.g3857, :buffer_m * 1.8)
       AND ST_DWithin(ST_Transform(n.geom, 2180), t.g2180, :buffer_m)
+      AND (CAST(:types AS text[]) IS NULL OR n.rodzaj = ANY(CAST(:types AS text[])))  -- filtr rodzaju
     ORDER BY route_km, distance_m
 """)
 
-def lodgings_near_route(geometry: dict, buffer_m: int) -> list[dict]:
+def lodgings_near_route(geometry: dict, buffer_m: int, types: list[str] | None = None) -> list[dict]:
     """Noclegi przy trasie (geometry: GeoJSON LineString z BRoutera), posortowane wzdłuż trasy."""
     with engine.connect() as conn:
-        rows = conn.execute(LODGINGS_NEAR_ROUTE, {"geom": json.dumps(geometry), "buffer_m": buffer_m})
+        rows = conn.execute(LODGINGS_NEAR_ROUTE, {"geom": json.dumps(geometry), "buffer_m": buffer_m, "types": types})
         return [dict(r) for r in rows.mappings()]
