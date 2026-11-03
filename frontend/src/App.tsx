@@ -185,6 +185,7 @@ export function App() {
                         <SearchBar isSidebarOpen={isSidebarOpen} />
                         <MapView
                             isSidebarOpen={isSidebarOpen}
+                            regionId="malopolskie" /* SEBKUC [mapa-regiony] na tymczasowo tutaj wybierasz malopolskie/pomorskie/maramures */
                             points={points}
                             onAddPoint={handleAddPoint}
                             onRemovePoint={handleRemovePoint}/>

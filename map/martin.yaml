@@ -1,0 +1,45 @@
+# Konfiguracja serwera kafli Martin (Trail-Strider).
+# Ścieżki widziane z wnętrza kontenera: /tiles = data/tiles, /map = map (wolumeny w compose.yaml).
+
+# brakujące źródło (np. nie uruchomiono db/sql/map_regions.sql) = ostrzeżenie w logach zamiast zatrzymania Martina
+on_invalid: warn
+
+# źródła z bazy: tylko jawnie wymienione tabele (bez automatycznego publikowania całej bazy)
+postgres:
+  connection_string: ${MARTIN_DATABASE_URL}   # zmienna ustawiana w compose.yaml, hasło nie trafia do repo
+  auto_publish: false
+  tables:
+    map_mask:                  # nazwa źródła = adres http://localhost:3000/map_mask
+      schema: app
+      table: map_mask
+      srid: 3857
+      geometry_column: geom
+      bounds: [-180, -85.0511, 180, 85.0511]   # cały świat; liczone automatycznie wychodzą odwrócone (zawinięcie długości przy 180°)
+    map_regions:
+      schema: app
+      table: map_regions
+      srid: 3857
+      geometry_column: geom
+      properties:
+        name: text             # do kafli trafia tylko nazwa regionu
+
+# podkład: każdy plik *.mbtiles z folderu to osobne źródło (nazwa = nazwa pliku)
+mbtiles:
+  paths:
+    - /tiles
+
+# PMTiles nie używamy; jawne ustawienie usuwa ostrzeżenie "Defaulting pmtiles.allow_http"
+pmtiles:
+  allow_http: false
+
+fonts:
+  paths:
+    - /map/fonts
+
+sprites:
+  paths:
+    - /map/sprites/ofm         # nazwa zestawu ikon = nazwa folderu (ofm)
+
+styles:
+  paths:
+    - /map/styles              # nazwa stylu = nazwa pliku (liberty)

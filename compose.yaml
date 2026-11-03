@@ -92,6 +92,20 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+  martin:
+    #image: ghcr.io/maplibre/martin:1.16.1    # przypięta wersja
+    image: ghcr.io/maplibre/martin:1.16.1@sha256:59902019bf9038926ff0c71174237d6852e64c457830a6349abe7090be8818ca   # przypięty skrót = dokładnie ta kompilacja
+    command: ["--config", "/map/martin.yaml"]   # co serwować: opisuje plik map/martin.yaml
+    ports:
+      - "127.0.0.1:3000:3000"            # tylko z tego komputera
+    volumes:
+      - ./data/tiles:/tiles:ro           # pliki .mbtiles (tylko odczyt)
+      - ./map:/map:ro                    # konfiguracja Martina, styl, czcionki, ikony (tylko odczyt)
+    environment:
+      MARTIN_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}   # wartości z pliku .env
+    depends_on:
+      db:
+        condition: service_healthy       # Martin startuje dopiero, gdy baza jest (healthy)
   frontend:
     build: ./frontend
     container_name: trail-strider-frontend-1
@@ -105,6 +119,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      martin:
+        condition: service_healthy       # mapa w przeglądarce pobiera styl i kafle z Martina
     restart: unless-stopped
 
 volumes:
