@@ -57,6 +57,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 /data/
+/profiles2/
 /output/
 /routing/output/
 
