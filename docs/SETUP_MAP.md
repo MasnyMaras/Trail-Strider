@@ -141,8 +141,8 @@ wget --spider https://download.geofabrik.de/europe/romania-261001.osm.pbf 2>&1 |
 ℹ️ Liczby LP mogą się u Ciebie różnić o 1 (`kubaturowe 192`, `lp 517`) – serwer Lasów nie udostępnia wersji
 z datą, więc liczba zależy od dnia, w którym wykonałeś krok 13. To normalne.
 
-ℹ️ Jeśli krok 15 wykonałeś już z nowszą wersją `noclegi.sql` (usuwa duplikaty biwaków), liczba `osm` w noclegach
-może być nieco mniejsza niż `3251`.
+ℹ️ Jeśli krok 15 wykonałeś już z nowszą wersją `noclegi.sql` (usuwa duplikaty biwaków i noclegi spoza regionów),
+liczby w noclegach będą mniejsze niż `lp 516`, `osm 3251`, `zanocuj 309`.
 
 ❌ Jakikolwiek widok w wyniku albo `404 Not Found` – zatrzymaj się i zgłoś.
 
@@ -564,7 +564,8 @@ docker compose exec db psql -U osm -d osm -P pager=off -c "SELECT wojewodztwo, c
 
 ## Krok 24. Wspólna tabela noclegów – przebudowa
 
-Skrypt z kroku 15. Noclegi OSM bierze z całej bazy, więc wchodzą wszystkie trzy regiony.
+Skrypt z kroku 15. Bierze noclegi z całej bazy (OSM, Lasy Państwowe, „Zanocuj w lesie”), usuwa duplikaty biwaków,
+a na końcu usuwa noclegi leżące poza trzema regionami.
 
 **Sprawdź przed:**
 ```bash
@@ -580,18 +581,23 @@ docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/no
 **Wymagane (końcówka wyniku):**
 | tabelka | musi pokazać |
 |---|---|
-| `INSERT` / `DELETE` | `INSERT 0 6721` (OSM), `INSERT 0 516` (LP), `DELETE 18` (duplikaty biwaków), `INSERT 0 723` (zanocuj) |
-| podsumowanie | 12 wierszy; `lp`: `miejsce_biwakowe 318`, `kwatera 187`, `pole_namiotowe 7`, `schronisko 4`; `osm`: `kwatera 4321`, `hotel 1598`, `pole_namiotowe 375`, `hostel 307`, `schronisko 52`, `chatka 26`, `miejsce_biwakowe 24`; `zanocuj`: `zanocuj_w_lesie 723` |
+| `INSERT` / `DELETE` / `SELECT` | `INSERT 0 6721` (OSM), `INSERT 0 516` (LP), `DELETE 18` (duplikaty biwaków), `INSERT 0 723` (zanocuj), `SELECT 3` (obrysy trzech regionów), `DELETE 542` (noclegi spoza regionów) |
+| podsumowanie | 11 wierszy; `lp`: `miejsce_biwakowe 61`, `kwatera 28`, `pole_namiotowe 1`; `osm`: `kwatera 4285`, `hotel 1594`, `pole_namiotowe 366`, `hostel 302`, `schronisko 46`, `chatka 21`, `miejsce_biwakowe 20`; `zanocuj`: `zanocuj_w_lesie 676` |
 | ostatnia linia | `COMMIT` |
 
-`DELETE 18` – pole namiotowe albo miejsce biwakowe z OSM leżące bliżej niż 50 m od pola namiotowego albo miejsca
-biwakowego Lasów Państwowych jest usuwane jako duplikat (zostaje wpis Lasów).
+- `DELETE 18` – pole namiotowe albo miejsce biwakowe z OSM leżące bliżej niż 50 m od pola namiotowego albo miejsca
+  biwakowego Lasów Państwowych jest usuwane jako duplikat (zostaje wpis Lasów),
+- `DELETE 542` – noclegi poza województwem małopolskim, pomorskim i okręgiem Maramureș: dane Lasów Państwowych
+  z reszty Polski, pas danych OSM za granicami regionów (pliki z Geofabrik mają zapas) i punkty „Zanocuj w lesie”
+  z obszarów przecinających granicę województwa, leżące tuż za nią.
 
-ℹ️ LP może się różnić o 1 (`INSERT 0 517`, `kwatera 188`) – z tego samego powodu co w kroku 16.
+ℹ️ LP może się różnić o 1 (`INSERT 0 517`) – z tego samego powodu co w kroku 16; wtedy `DELETE 542` i liczby `lp`
+mogą się różnić o 1.
 
-**Sprawdź po – noclegi według regionów:**
+**Sprawdź po – noclegi według regionów i w całej tabeli:**
 ```bash
 docker compose exec db psql -U osm -d osm -P pager=off -c "WITH r AS MATERIALIZED (SELECT tags->>'name' AS region, ST_BuildArea(geom) AS g FROM boundaries WHERE tags->>'admin_level' = '4' AND tags->>'name' IN ('województwo małopolskie', 'województwo pomorskie', 'Maramureș')) SELECT r.region, n.zrodlo, count(*) FROM app.noclegi n JOIN r ON ST_Intersects(n.geom, r.g) GROUP BY 1, 2 ORDER BY 1, 2;"
+docker compose exec db psql -U osm -d osm -P pager=off -c "SELECT zrodlo, count(*) FROM app.noclegi GROUP BY 1 ORDER BY 1;"
 ```
 `MATERIALIZED` – wielokąty regionów są budowane raz, a nie osobno dla każdego noclegu.
 
@@ -606,10 +612,10 @@ docker compose exec db psql -U osm -d osm -P pager=off -c "WITH r AS MATERIALIZE
 | `województwo pomorskie` | `osm` | `3153` |
 | `województwo pomorskie` | `zanocuj` | `380` |
 
-- Maramureș ma tylko `osm` (LP i „Zanocuj w lesie” to dane z Polski),
-- `osm` razem 6634, a w tabeli 6703 (6721 − 18 duplikatów) – reszta leży w pasie danych za granicami regionów
-  (pliki z Geofabrik mają zapas),
-- `zanocuj` mniej niż w kroku 23 – obszary przecinające granicę województwa mają część punktów tuż za nią.
+Druga komenda (cała tabela): `lp 90`, `osm 6634`, `zanocuj 676` – to dokładnie sumy z regionów, czyli w `app.noclegi`
+nie ma noclegów spoza regionów.
+
+- Maramureș ma tylko `osm` (LP i „Zanocuj w lesie” to dane z Polski).
 
 
 ---
@@ -1245,7 +1251,6 @@ Aplikacja: `http://localhost:5173`. Koniec pracy: `docker compose stop`.
   terenu za granicą województwa, a napisy są rysowane nad maską.
 - Część nazw jest po angielsku (np. `Krakow`) – styl wybiera najpierw nazwę angielską (`name_en`).
 - Ostrzeżenia w konsoli przeglądarki z kroku 29a.
-- `app.noclegi` zawiera też noclegi spoza regionów (dane Lasów Państwowych z całej Polski, pas danych z Geofabrik).
 - Trasy z BRoutera nie są ograniczone do regionu.
 
 
