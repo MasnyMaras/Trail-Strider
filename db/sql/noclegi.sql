@@ -76,6 +76,14 @@ WHERE o.zrodlo = 'osm' AND l.zrodlo = 'lp'
 INSERT INTO app.noclegi (zrodlo, zrodlo_id, rodzaj, nazwa, super, woda_rodzaj, woda_odl_m, geom)
 SELECT 'zanocuj', id::text, 'zanocuj_w_lesie', NULL, super, woda_rodzaj, woda_odl_m, geom
 FROM bdl.zanocuj_punkty;
+CREATE TEMP TABLE t_regiony ON COMMIT DROP AS
+SELECT ST_BuildArea(geom) AS geom
+FROM boundaries
+WHERE tags->>'admin_level' = '4'
+  AND tags->>'name' IN ('województwo małopolskie', 'województwo pomorskie', 'Maramureș');
+
+DELETE FROM app.noclegi n
+WHERE NOT EXISTS (SELECT 1 FROM t_regiony r WHERE ST_Intersects(n.geom, r.geom));
 
 CREATE INDEX noclegi_geom_idx ON app.noclegi USING gist (geom);
 ANALYZE app.noclegi;
