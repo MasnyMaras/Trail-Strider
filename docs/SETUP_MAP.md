@@ -632,8 +632,7 @@ git status --short
 ℹ️ `romania-261001.osm.pbf` na razie zostaw – usuwasz go w kroku 31, po zakończeniu części 2.
 `kopia_bdl.dump` możesz zachować jako kopię zapasową albo usunąć (krok 31); nie zawiera punktów pomorskich z kroku 23.
 
-ℹ️ Wyznaczanie tras w nowych regionach wymaga kafli BRoutera `E15_N50` (pomorskie) i `E20_N45` (Maramureș) –
-osobno, według `docs/BROUTER.md`.
+ℹ️ Wyznaczanie tras we wszystkich trzech regionach wymaga pięciu kafli BRoutera – `docs/BROUTER.md`, krok 4.
 
 
 ---
@@ -730,6 +729,43 @@ ls data
 
 ❌ `data/tiles` już istnieje, a jego właścicielem jest `root` – zatrzymaj się i zgłoś.
 
+**Połączenie z serwerami danych dodatkowych** (Planetiler pobiera z nich pliki w 26c):
+```bash
+curl -sSIL --max-time 20 -o /dev/null -w "%{http_code}\n" https://osmdata.openstreetmap.de/download/water-polygons-split-3857.zip
+curl -sSIL --max-time 20 -o /dev/null -w "%{http_code}\n" https://naciscdn.org/naturalearth/packages/natural_earth_vector.sqlite.zip
+curl -sSIL --max-time 20 -o /dev/null -w "%{http_code}\n" https://github.com/acalcutt/osm-lakelines/releases/download/v12/lake_centerline.shp.zip
+```
+
+| fragment | znaczenie |
+|---|---|
+| `-I` | tylko nagłówki odpowiedzi, bez pobierania pliku |
+| `-L` | podążaj za przekierowaniem (GitHub przekierowuje na inny serwer) |
+| `-sS` | bez paska postępu, ale z komunikatem błędu |
+| `--max-time 20` | przerwij po 20 s zamiast czekać bez końca |
+| `-o /dev/null -w "%{http_code}\n"` | wypisz tylko kod odpowiedzi HTTP |
+
+**Wymagane:** każda komenda wypisuje `200`.
+
+❌ Przy `osmdata.openstreetmap.de` (obrysy mórz) pojawia się `curl: (7) Failed to connect …` albo `curl: (28) … timed out`
+i `000` – Twój komputer nie łączy się z tym serwerem (zdarzyło się u dwóch osób). Nie uruchamiaj 26c, tylko skopiuj
+plik od osoby, która już go ma:
+1. Wrzuć `water-polygons-split-3857.zip` do `data/sources/` (nazwa musi być dokładnie taka; jeśli folderu nie ma:
+   `mkdir -p data/sources`).
+2. Sprawdź, czy plik nie uszkodził się po drodze:
+   ```bash
+   ls -l data/sources/water-polygons-split-3857.zip
+   sha256sum data/sources/water-polygons-split-3857.zip
+   ```
+   Rozmiar i suma muszą być identyczne jak u osoby, od której kopiujesz. Plik autora instrukcji: `931892733`,
+   `99619ac05f2d19771d522c868232b2a0373b86925d2c60fed9173bd31b7658e2`.
+3. Dalej normalnie 26b i 26c. `--download` pobiera tylko brakujące pliki, więc obrysów mórz już nie pobiera.
+
+❌ Brak połączenia z innym serwerem – tak samo: skopiuj odpowiedni plik (`natural_earth_vector.sqlite.zip` albo
+`lake_centerline.shp.zip`) do `data/sources/` i porównaj `sha256sum` z osobą, od której kopiujesz.
+
+ℹ️ Przy `available` ok. 2,9Gi (z wolnym swapem) 26c też przeszło, w 3:46.
+
+
 ### 26b. Obraz Planetilera i folder na kafle
 
 **Wykonaj:**
@@ -811,6 +847,32 @@ i Słowacji są w pliku województwa tylko we fragmentach; linie granic i tak tr
 `data errors` w podsumowaniu to automatycznie naprawione albo pominięte geometrie – też w porządku.
 
 ❌ `OutOfMemoryError`, `ERROR` albo `Exception` – zatrzymaj się i zgłoś (dołącz ok. 30 linii logu wokół błędu).
+
+⚠️ Po nieudanym uruchomieniu **nie uruchamiaj 26c ponownie przed zgłoszeniem**. `tee` nadpisuje
+`malopolskie.log` przy każdym uruchomieniu, a druga próba i tak kończy się `already exists` (niżej), więc przyczyna
+z pierwszej przepada.
+
+❌ `already exists, use the --force argument to overwrite` – w `data/tiles` został pusty plik `.mbtiles` (0 B)
+po wcześniejszej, nieudanej próbie. Usuń pozostałości:
+```bash
+rm -f data/tiles/malopolskie.mbtiles
+rm -rf data/tmp
+```
+Potem wróć do testu połączenia (`curl`) z 26a. Jeśli wszystko daje `200`, uruchom 26c jeszcze raz, a przy kolejnym
+błędzie zgłoś cały `malopolskie.log`.
+
+❌ Log kończy się nagle, bez `FINISHED!` i bez `Exception` – prawdopodobnie systemowi zabrakło RAM-u i zabił proces.
+Sprawdź:
+```bash
+journalctl -k | grep -i "killed process"
+```
+Jeśli jest tam `java`, zamknij ciężkie programy (przeglądarka, Discord), sprawdź `free -h`, usuń pozostałości jak
+wyżej i uruchom ponownie.
+
+ℹ️ Jeśli obrysy mórz zostały skopiowane w 26a, `grep "Downloading https"` pokaże tylko Natural Earth
+i `lake_centerline` – to w porządku.
+
+ℹ️ Powyższe dotyczy też 26d i 26e – podmień `malopolskie` na `pomorskie` albo `maramures`.
 
 ### 26d. Pomorskie
 

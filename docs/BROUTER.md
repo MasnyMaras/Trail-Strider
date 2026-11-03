@@ -141,3 +141,63 @@ docker compose up -d brouter          # uruchom
 docker compose stop brouter           # zatrzymaj
 docker compose logs --tail 50 brouter # ostatnie logi
 ```
+
+
+
+---
+
+## Krok 4. Kafle dla wszystkich trzech regionów
+
+Krok 1 pobiera tylko `E20_N50`. Trasy w całej Małopolsce, w województwie pomorskim i w okręgu Maramureș
+wymagają pięciu kafli:
+
+| kafel | obszar | co obejmuje |
+|---|---|---|
+| `E15_N45` | 15–20°E, 45–50°N | Małopolska – południowy zachód (np. Zakopane) |
+| `E15_N50` | 15–20°E, 50–55°N | Małopolska – Kraków i zachód; całe pomorskie |
+| `E20_N45` | 20–25°E, 45–50°N | Małopolska – południowy wschód (np. Nowy Sącz); prawie cały Maramureș |
+| `E20_N50` | 20–25°E, 50–55°N | Małopolska – północny wschód (krok 1) |
+| `E25_N45` | 25–30°E, 45–50°N | Maramureș – wschodni skraj (na wschód od 25°E) |
+
+**Sprawdź przed:**
+```bash
+ls -l routing/segments4
+df -h /
+```
+
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| `ls -l routing/segments4` | `E20_N50.rd5` (krok 1) |
+| `df -h /` | `Avail` co najmniej **1G** (pobieranie ok. 330 MB) |
+
+**Wykonaj:**
+```bash
+for k in E15_N45 E15_N50 E20_N45 E25_N45; do
+  wget -P routing/segments4 https://brouter.de/brouter/segments4/$k.rd5
+done
+docker compose restart brouter
+```
+- pętla pobiera po kolei 4 brakujące kafle (`$k` = nazwa kafla),
+- `restart` – BRouter uruchamia się od nowa i widzi nowe pliki.
+
+**Sprawdź po:**
+```bash
+ls -l routing/segments4
+git status --short
+docker compose ps brouter
+```
+
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| `wget` (każdy z 4) | na końcu `saved [N/N]` – obie liczby równe |
+| `ls -l routing/segments4` | 5 plików; stan na 3.11.2026: `E15_N45.rd5` **130338886**, `E15_N50.rd5` **90529294**, `E20_N45.rd5` **67837996**, `E20_N50.rd5` **68623840** (krok 1, stan 12.10.2026), `E25_N45.rd5` **40964538** |
+| `git status --short` | pusto (pliki `.rd5` nie trafiają do repozytorium) |
+| `docker compose ps brouter` | `Up` |
+
+ℹ️ Serwer `brouter.de` aktualizuje kafle pod tą samą nazwą – przy późniejszym pobraniu rozmiary mogą się różnić.
+Liczy się `saved [N/N]`.
+
+ℹ️ Wyznaczanie tras w nowych kaflach nie zostało jeszcze przetestowane (do zrobienia przez osobę odpowiedzialną
+za routing).
