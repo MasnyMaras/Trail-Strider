@@ -22,6 +22,14 @@ postgres:
       geometry_column: geom
       properties:
         name: text             # do kafli trafia tylko nazwa regionu
+    trails:                    # szlaki piesze (db/sql/trails.sql)
+      schema: app
+      table: trails
+      srid: 3857
+      geometry_column: geom
+      properties:
+        name: text
+        color: text            # kolor szlaku (red, blue, ...; pusty = brak koloru)
 
 # podkład: każdy plik *.mbtiles z folderu to osobne źródło (nazwa = nazwa pliku)
 mbtiles:

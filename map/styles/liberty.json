@@ -12,6 +12,10 @@
     "map_regions": {
       "type": "vector",
       "url": "http://localhost:3000/map_regions"
+    },
+    "trails": {
+      "type": "vector",
+      "url": "http://localhost:3000/trails"
     }
   },
   "sprite": "http://localhost:3000/sprite/ofm",
@@ -4152,6 +4156,21 @@
           12,
           3
         ]
+      }
+    },
+    {
+      "id": "trails",
+      "type": "line",
+      "source": "trails",
+      "source-layer": "trails",
+      "minzoom": 11,
+      "layout": {"line-cap": "round", "line-join": "round"},
+      "paint": {
+        "line-color": ["match", ["get", "color"],
+          "red", "#e2001a", "blue", "#0060c0", "green", "#00913f", "yellow", "#f2c500", "black", "#222222",
+          "purple", "#7b2c8f", "brown", "#8b5a2b", "orange", "#f08c00",
+          "#888888"],
+        "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.0, 16, 2.0]
       }
     },
     {
