@@ -4163,7 +4163,7 @@
       "type": "line",
       "source": "trail_segments",
       "source-layer": "trail_segments",
-      "minzoom": 11,
+      "minzoom": 12,
       "layout": {"line-cap": "round", "line-join": "round"},
       "paint": {
         "line-color": ["match", ["get", "color"],
