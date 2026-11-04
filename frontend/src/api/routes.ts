@@ -16,12 +16,14 @@ function isRouteResponse(value: unknown): value is RouteResponse {
 
 export async function calculateRoute(
     request: RouteRequest,
+    signal?: AbortSignal,
 ): Promise<RouteResponse> {
     const response = await fetch("/api/route", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
         },
+        signal,
         body: JSON.stringify(request),
     })
 

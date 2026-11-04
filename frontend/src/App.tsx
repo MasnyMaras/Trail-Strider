@@ -8,9 +8,10 @@ import SaveRoute from "@/components/ui/save_route"
 import NotFound from "@/components/ui/not_found"
 //import SearchBar from "@/components/ui/search_bar";
 import ElevationProfile from "@/components/ui/elevation_profile.tsx";
+import type { RegionId } from "@/components/map/Regions"
 import { calculateRoute } from "@/api/routes"
-import { useEffect, useState, useCallback } from "react";
-import type { RoutePoint, RouteResponse } from "@/types/route"
+import { useEffect, useState, useCallback, useRef } from "react";
+import type { RoutePoint, RouteResponse, SinglePointRole } from "@/types/route"
 
 export interface RoutePreferences {
     difficulty: number;
@@ -33,6 +34,9 @@ export function App() {
     const [routeResponse, setRouteResponse] = useState<RouteResponse | null>(null)
     const [routeError, setRouteError] = useState<string | null>(null)
     const [isRouteLoading, setIsRouteLoading] = useState(false)
+    const [regionId, setRegionId] = useState<RegionId>("malopolskie")
+    const [singlePointRole, setSinglePointRole] = useState<SinglePointRole>(null)
+    const routeRequestRef = useRef<AbortController | null>(null)
 
     const [points, setPoints] = useState<RoutePoint[]>([
         { id: "start-initial", value: "" },
@@ -46,6 +50,7 @@ export function App() {
             value: defaultName,
             coordinates: coords,
         }
+        setSinglePointRole(null)
 
         setPoints((prev) => {
             const copy = [...prev]
@@ -73,7 +78,33 @@ export function App() {
         })
     }
     const handleRemovePoint = (id: string) => {
-        setPoints((prev) => prev.filter((p) => p.id !== id))
+        setPoints((prev) => {
+            const removedIndex = prev.findIndex((point) => point.id === id)
+            const nextPoints = prev.filter((point) => point.id !== id)
+            const hadTwoCoordinates = prev.length === 2 && prev.every((point) => point.coordinates)
+
+            if (hadTwoCoordinates && nextPoints.length === 1) {
+                setSinglePointRole(removedIndex === 0 ? "end" : "start")
+            } else {
+                setSinglePointRole(null)
+            }
+
+            return nextPoints
+        })
+    }
+
+    const handleRegionChange = (nextRegionId: RegionId) => {
+        if (nextRegionId === regionId) return
+
+        setRegionId(nextRegionId)
+        setSinglePointRole(null)
+        setPoints([
+            { id: "start-initial", value: "" },
+            { id: "end-initial", value: "" },
+        ])
+        setRouteResponse(null)
+        setRouteError(null)
+        setRouteStats(null)
     }
 
     const handleUpdatePointValue = (id: string, newValue: string) => {
@@ -124,22 +155,30 @@ export function App() {
 
         setIsRouteLoading(true)
         setRouteError(null)
+        routeRequestRef.current?.abort()
+        const abortController = new AbortController()
+        routeRequestRef.current = abortController
 
         try {
             const response = await calculateRoute({
                 points: coordinates,
                 mode: isAutoMode ? "a" : "m",
-            })
-            setRouteResponse(response)
+            }, abortController.signal)
+            if (!abortController.signal.aborted) {
+                setRouteResponse(response)
+            }
         } catch (error) {
-            setRouteResponse(null)
+            if (abortController.signal.aborted) return
             setRouteError(
                 error instanceof Error
                     ? error.message
                     : "Nie udało się wyznaczyć trasy.",
             )
         } finally {
-            setIsRouteLoading(false)
+            if (routeRequestRef.current === abortController) {
+                setIsRouteLoading(false)
+                routeRequestRef.current = null
+            }
         }
     },[points, isAutoMode])
 
@@ -150,7 +189,9 @@ export function App() {
             if (validCoords.length >= 2) {
                 void handleCalculateRoute();
             } else {
-                setRouteResponse(null);
+                if (validCoords.length < 2) {
+                    setRouteResponse(null);
+                }
             }
         }, 400);
 
@@ -200,7 +241,12 @@ export function App() {
                         {/*<SearchBar isSidebarOpen={isSidebarOpen} />*/}
                         <MapView
                             isSidebarOpen={isSidebarOpen}
-                            regionId="malopolskie" /* SEBKUC [mapa-regiony] na tymczasowo tutaj wybierasz malopolskie/pomorskie/maramures */
+                            regionId={regionId}
+                            onRegionChange={handleRegionChange}
+                            isRouteLoading={isRouteLoading}
+                            singlePointRole={singlePointRole}
+                            isAutoMode={isAutoMode}
+                            automaticWaypoints={routeResponse?.waypoints}
                             points={points}
                             onAddPoint={handleAddPoint}
                             onRemovePoint={handleRemovePoint}
@@ -214,6 +260,7 @@ export function App() {
                             onRemoveStop={handleRemovePoint}
                             onUpdatePointValue={handleUpdatePointValue}
                             onReorderPoints={setPoints}
+                            singlePointRole={singlePointRole}
                             isAutoMode={isAutoMode}
                             onAutoModeToggle={setIsAutoMode}
                             onOpenPreferences={() => setIsPreferencesOpen(true)}

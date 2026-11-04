@@ -4,6 +4,8 @@ export interface RoutePoint {
     coordinates?: Coordinates
 }
 
+export type SinglePointRole = "start" | "end" | null
+
 export type Coordinates = [
     longitude: number,
     latitude: number,

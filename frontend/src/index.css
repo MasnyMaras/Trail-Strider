@@ -120,6 +120,36 @@
   * {
     @apply border-border outline-ring/50;
     }
+
+    @media (max-width: 639px) {
+      .maplibregl-ctrl-bottom-left {
+        bottom: 2.15rem !important;
+        left: 0.25rem !important;
+        transform: scale(0.78);
+        transform-origin: bottom left;
+      }
+
+      .maplibregl-ctrl-bottom-right {
+        right: 0.25rem !important;
+        bottom: 2.15rem !important;
+        max-width: 42vw;
+      }
+
+      .maplibregl-ctrl-attrib {
+        font-size: 8px !important;
+        line-height: 1.15 !important;
+        max-width: 42vw;
+      }
+
+      .maplibregl-ctrl-attrib.maplibregl-compact {
+        min-height: 18px;
+      }
+
+      .maplibregl-ctrl-attrib.maplibregl-compact.maplibregl-compact-show {
+        max-height: 30vh;
+        overflow-y: auto;
+      }
+    }
   body {
     @apply bg-background text-foreground;
     }

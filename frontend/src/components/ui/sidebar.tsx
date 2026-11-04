@@ -1,7 +1,7 @@
-import { useState} from "react";
+import { useEffect, useState} from "react";
 // import { ChevronLeft, ChevronRight, Download, Plus, Menu, X, Route,ChevronDown, ChevronUp } from "lucide-react"; //Route used in divide the route button, dwnld in save to gpx
 import { ChevronLeft, ChevronRight, Plus, Menu, X,ChevronDown, ChevronUp } from "lucide-react";
-import type { RoutePoint, ElevationPoint } from "@/types/route";
+import type { RoutePoint, ElevationPoint, SinglePointRole } from "@/types/route";
 import type { RoutePreferences, DayStat } from "@/App";
 import ElevationProfile from "@/components/ui/elevation_profile"
 
@@ -13,6 +13,7 @@ interface SidebarProps {
     onRemoveStop: (id: string) => void;
     onUpdatePointValue: (id: string, newValue: string) => void;
     onReorderPoints: (newPoints: RoutePoint[]) => void;
+    singlePointRole: SinglePointRole;
     isAutoMode: boolean;
     onAutoModeToggle: (newState: boolean) => void;
     onOpenPreferences: () => void;
@@ -33,6 +34,7 @@ export default function Sidebar({
                                 onRemoveStop,
                                 onUpdatePointValue,
                                 onReorderPoints,
+                                singlePointRole,
                                 isAutoMode,
                                 onAutoModeToggle,
                                 //onOpenPreferences,
@@ -40,13 +42,20 @@ export default function Sidebar({
                                 routePreferences,
                                 routeStats,
                                 // onCalculateRoute,
-                                // isRouteLoading,
+                                isRouteLoading,
                                 routeError,
                                 elevationProfile,
 }: SidebarProps) {
 
 
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    const [draggedPoints, setDraggedPoints] = useState<RoutePoint[] | null>(null);
+
+    useEffect(() => {
+        if (draggedIndex === null) {
+            setDraggedPoints(null)
+        }
+    }, [points, draggedIndex])
 
     const addStop = (insertIndex: number) => {
         onAddStop(insertIndex);
@@ -62,22 +71,27 @@ export default function Sidebar({
 
     const handleDragStart = (e: React.DragEvent, index: number) => {
         setDraggedIndex(index);
+        setDraggedPoints(points)
         e.dataTransfer.effectAllowed = "move";
     };
 
     const handleDragEnter = (_e: React.DragEvent, targetIndex: number) => {
         if (draggedIndex === null || draggedIndex === targetIndex) return;
 
-        const newPoints = [...points];
+        const newPoints = [...(draggedPoints ?? points)];
         const [moved] = newPoints.splice(draggedIndex, 1);
         newPoints.splice(targetIndex, 0, moved);
-        onReorderPoints(newPoints);
 
+        setDraggedPoints(newPoints);
         setDraggedIndex(targetIndex);
     };
 
     const handleDragEnd = () => {
+        if (draggedPoints) {
+            onReorderPoints(draggedPoints)
+        }
         setDraggedIndex(null);
+        setDraggedPoints(null);
     };
     const handleAutoModeToggle = () => {
         const newState = !isAutoMode;
@@ -115,8 +129,13 @@ export default function Sidebar({
                     <button
                         type="button"
                         onClick={handleAutoModeToggle}
+                        disabled={isRouteLoading}
                         className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border transition-colors duration-300 ease-in-out focus:outline-none ${
-                            isAutoMode ? "border-green-700 bg-green-700" : "border-slate-300 bg-gray-300"
+                            isRouteLoading
+                                ? "cursor-wait border-slate-200 bg-slate-200 opacity-60"
+                                : isAutoMode
+                                    ? "border-green-700 bg-green-700"
+                                    : "border-slate-300 bg-gray-300"
                         }`}
                         aria-pressed={isAutoMode}
                     >
@@ -132,11 +151,19 @@ export default function Sidebar({
                     onWheel={(e) => e.stopPropagation()}
                     onDragOver={(e) => e.preventDefault()}
                 >
-                    {points.map((point, index) => {
+                    {isRouteLoading && (
+                        <div className="mb-3 flex items-center justify-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-xs font-medium text-green-800">
+                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-green-700 border-t-transparent" />
+                            Aktualizowanie trasy...
+                        </div>
+                    )}
+                    {(draggedPoints ?? points).map((point, index) => {
                         const isFirst = index === 0;
                         const isLast = index === points.length - 1;
-                        const canDelete = !isFirst && !isLast;
-                        const labelText = isFirst ? "Początek trasy" : isLast ? "Koniec trasy" : `Przystanek ${index}`;
+                        const canDelete = Boolean(point.coordinates) && points.length > 1;
+                        const labelText = points.length === 1 && singlePointRole === "end"
+                            ? "Koniec trasy"
+                            : isFirst ? "Początek trasy" : isLast ? "Koniec trasy" : `Przystanek ${index}`;
                         const isDragged = draggedIndex === index;
 
                         return (
@@ -144,13 +171,13 @@ export default function Sidebar({
 
                                 <div
                                     className="flex w-full items-center gap-2"
-                                    onDragEnter={(e) => handleDragEnter(e, index)}
+                                    onDragEnter={(e) => !isRouteLoading && handleDragEnter(e, index)}
                                     onDragOver={(e) => e.preventDefault()}
                                 >
 
                                     <div
-                                        draggable
-                                        onDragStart={(e) => handleDragStart(e, index)}
+                                        draggable={!isRouteLoading}
+                                        onDragStart={(e) => !isRouteLoading && handleDragStart(e, index)}
                                         onDragEnd={handleDragEnd}
                                         className={`group flex flex-1 items-center rounded-xl bg-white px-3 py-1 shadow-sm border transition-all duration-300 focus-within:shadow-md focus-within:border-green-700 focus-within:hover:border-green-700 ${
                                             isDragged
@@ -166,9 +193,10 @@ export default function Sidebar({
                                                 type="text"
                                                 value={point.value}
                                                 onChange={(e) => updatePointValue(point.id, e.target.value)}
+                                                disabled={isRouteLoading}
                                                 placeholder={`Wpisz ${labelText.toLowerCase()}...`}
                                                 className="w-full bg-transparent text-sm font-medium text-slate-800 placeholder:text-slate-300 focus:outline-none"
-                                                draggable
+                                                draggable={!isRouteLoading}
                                                 onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                                 onKeyDown={(e) => {
                                                     if (e.key === "Enter") {
@@ -188,6 +216,7 @@ export default function Sidebar({
                                     {canDelete ? (
                                         <button
                                             onClick={() => removeStop(point.id)}
+                                            disabled={isRouteLoading}
                                             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/50 text-slate-500 shadow-sm transition-colors hover:bg-white hover:text-red-500"
                                             title="Usuń przystanek"
                                         >
@@ -208,6 +237,7 @@ export default function Sidebar({
 
                                         <button
                                             onClick={() => addStop(index + 1)}
+                                            disabled={isRouteLoading}
                                             className="absolute right-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/70 text-green-700 shadow-sm transition-colors hover:bg-white border border-transparent hover:border-green-700"
                                             title="Dodaj przystanek tutaj"
                                         >
