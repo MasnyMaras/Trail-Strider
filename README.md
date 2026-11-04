@@ -8,9 +8,10 @@ Description of repository directories:
 ```
 Trail-Strider/
 ├── backend/            FastAPI service with SQLAlchemy & psycopg; handles API endpoints
-├── db/                 PostgreSQL/PostGIS setup and osm2pgsql configs, including ETL scripts importing State Forests (BDL) and "Zanocuj w lesie" lodging points with water-proximity weighting
+├── db/                 PostgreSQL/PostGIS setup and osm2pgsql configs, including ETL scripts importing State Forests (BDL) and "Zanocuj w lesie" lodging points with water-proximity weighting, and SQL scripts building the lodging table
 ├── docs/               Project documentation, guides, and technical specifications
 ├── frontend/           React + TypeScript (Vite) SPA
+├── map/                Local map assets served by the Martin tile server: map style, fonts, icons and Martin configuration
 ├── routing/            Pedestrian routing service integrating local BRouter instance, routing profiles, and Google OR-Tools for automated TSP waypoint optimization
 ├── utils/              Helper scripts
 ├── .env.example        Example environment variables configuration file          
@@ -34,6 +35,9 @@ This project integrates various open-source components. All utilized tools are a
 | **PostgreSQL** | PostgreSQL License |
 | **PostGIS** | GPLv2+ |
 | **osm2pgsql** | GNU GPL v2 |
+| **osmium-tool** | GNU GPL v3|
+| **Planetiler** | Apache 2.0 |
+| **Martin** | Apache 2.0 / MIT |
 | **React** | MIT |
 | **TypeScript** | Apache 2.0 |
 | **Vite** | MIT |
