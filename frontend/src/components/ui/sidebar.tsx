@@ -1,7 +1,9 @@
 import { useState} from "react";
-import { ChevronLeft, ChevronRight, Download, Plus, Menu, X, Route,ChevronDown, ChevronUp } from "lucide-react";
-import type { RoutePoint } from "@/types/route";
+// import { ChevronLeft, ChevronRight, Download, Plus, Menu, X, Route,ChevronDown, ChevronUp } from "lucide-react"; //Route used in divide the route button, dwnld in save to gpx
+import { ChevronLeft, ChevronRight, Plus, Menu, X,ChevronDown, ChevronUp } from "lucide-react";
+import type { RoutePoint, ElevationPoint } from "@/types/route";
 import type { RoutePreferences, DayStat } from "@/App";
+import ElevationProfile from "@/components/ui/elevation_profile"
 
 interface SidebarProps {
     isOpen: boolean;
@@ -20,6 +22,7 @@ interface SidebarProps {
     onCalculateRoute: () => void;
     isRouteLoading: boolean;
     routeError: string | null;
+    elevationProfile?: ElevationPoint[];
 }
 
 export default function Sidebar({
@@ -32,13 +35,14 @@ export default function Sidebar({
                                 onReorderPoints,
                                 isAutoMode,
                                 onAutoModeToggle,
-                                onOpenPreferences,
-                                onOpenSaveRoute,
+                                //onOpenPreferences,
+                                //onOpenSaveRoute,
                                 routePreferences,
                                 routeStats,
                                 // onCalculateRoute,
                                 // isRouteLoading,
                                 routeError,
+                                elevationProfile,
 }: SidebarProps) {
 
 
@@ -228,22 +232,23 @@ export default function Sidebar({
                         </p>
                     )}
 
-                    <button
-                        onClick={onOpenPreferences}
-                        className="group relative mt-6 shrink-0 flex h-10 w-full items-center overflow-hidden rounded-full bg-white border border-white/60 text-xs font-medium text-slate-800 shadow-sm transition-colors duration-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-700 focus:ring-offset-2 md:h-11 md:text-sm"
-                    >
-                        <span className="absolute left-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-green-700 transition-transform duration-700 ease-out group-hover:scale-[250]"></span>
-                        <div className="relative z-10 flex w-full items-center justify-center gap-2 px-5 transition-all duration-500">
-                            <span className="w-2 transition-all duration-500 group-hover:w-0 group-hover:-ml-2"></span>
-                            <span className="transition-all duration-500">Podziel trasę</span>
-                            <div className="w-0 overflow-hidden opacity-0 transition-all duration-500 group-hover:w-4 group-hover:opacity-100">
-                                <Route className="h-4 w-4" />
-                            </div>
-                        </div>
-                    </button>
+                    {/*<button*/}
+                    {/*    onClick={onOpenPreferences}*/}
+                    {/*    className="group relative mt-6 shrink-0 flex h-10 w-full items-center overflow-hidden rounded-full bg-white border border-white/60 text-xs font-medium text-slate-800 shadow-sm transition-colors duration-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-700 focus:ring-offset-2 md:h-11 md:text-sm"*/}
+                    {/*>*/}
+                    {/*    <span className="absolute left-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-green-700 transition-transform duration-700 ease-out group-hover:scale-[250]"></span>*/}
+                    {/*    <div className="relative z-10 flex w-full items-center justify-center gap-2 px-5 transition-all duration-500">*/}
+                    {/*        <span className="w-2 transition-all duration-500 group-hover:w-0 group-hover:-ml-2"></span>*/}
+                    {/*        <span className="transition-all duration-500">Podziel trasę</span>*/}
+                    {/*        <div className="w-0 overflow-hidden opacity-0 transition-all duration-500 group-hover:w-4 group-hover:opacity-100">*/}
+                    {/*            <Route className="h-4 w-4" />*/}
+                    {/*        </div>*/}
+                    {/*    </div>*/}
+                    {/*</button>*/}
 
                     <div className="my-4 flex min-h-[100px] w-full shrink-0 items-center justify-center rounded-xl bg-white/40 p-4 shadow-sm backdrop-blur-sm">
-                        <span className="text-sm font-bold text-slate-700">Wykres wysokościowy całej trasy</span>
+                        {/*<span className="text-sm font-bold text-slate-700">Wykres wysokościowy całej trasy</span>*/}
+                        <ElevationProfile data={elevationProfile} />
                     </div>
 
                     {routePreferences && routePreferences.days > 0 && (
@@ -298,20 +303,20 @@ export default function Sidebar({
                 </div>
 
 
-                <button
-                    onClick={onOpenSaveRoute}
-                    className="group relative mt-auto flex h-10 w-full items-center overflow-hidden rounded-full bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 shadow-sm transition-colors duration-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-700 focus:ring-offset-2 md:h-11 md:text-sm"
-                >
-                    <span className="absolute left-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-green-700 transition-transform duration-700 ease-out group-hover:scale-[250]"></span>
+                {/*<button*/}
+                {/*    onClick={onOpenSaveRoute}*/}
+                {/*    className="group relative mt-auto flex h-10 w-full items-center overflow-hidden rounded-full bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 shadow-sm transition-colors duration-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-700 focus:ring-offset-2 md:h-11 md:text-sm"*/}
+                {/*>*/}
+                {/*    <span className="absolute left-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-green-700 transition-transform duration-700 ease-out group-hover:scale-[250]"></span>*/}
 
-                    <div className="relative z-10 flex w-full items-center justify-center gap-2 px-5 transition-all duration-500">
-                        <span className="w-2 transition-all duration-500 group-hover:w-0 group-hover:-ml-2"></span>
-                        <span className="transition-all duration-500">Zapisz jako GPX</span>
-                        <div className="w-0 overflow-hidden opacity-0 transition-all duration-500 group-hover:w-4 group-hover:opacity-100">
-                            <Download className="h-4 w-4" />
-                        </div>
-                    </div>
-                </button>
+                {/*    <div className="relative z-10 flex w-full items-center justify-center gap-2 px-5 transition-all duration-500">*/}
+                {/*        <span className="w-2 transition-all duration-500 group-hover:w-0 group-hover:-ml-2"></span>*/}
+                {/*        <span className="transition-all duration-500">Zapisz jako GPX</span>*/}
+                {/*        <div className="w-0 overflow-hidden opacity-0 transition-all duration-500 group-hover:w-4 group-hover:opacity-100">*/}
+                {/*            <Download className="h-4 w-4" />*/}
+                {/*        </div>*/}
+                {/*    </div>*/}
+                {/*</button>*/}
             </div>
         </aside>
     );

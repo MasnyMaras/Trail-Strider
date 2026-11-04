@@ -13,19 +13,19 @@ interface ElevationProfileProps {
     data?: ElevationPoint[]
 }
 
-const testData: ElevationPoint[] = [
-    { distance_meters: 0, elevation_meters: 312 },
-    { distance_meters: 400, elevation_meters: 326 },
-    { distance_meters: 800, elevation_meters: 341 },
-    { distance_meters: 1200, elevation_meters: 335 },
-    { distance_meters: 1600, elevation_meters: 358 },
-    { distance_meters: 2000, elevation_meters: 374 },
-    { distance_meters: 2400, elevation_meters: 366 },
-    { distance_meters: 2800, elevation_meters: 391 },
-    { distance_meters: 3200, elevation_meters: 405 },
-    { distance_meters: 3600, elevation_meters: 398 },
-    { distance_meters: 4000, elevation_meters: 421 },
-]
+// const testData: ElevationPoint[] = [
+//     { distance_meters: 0, elevation_meters: 312 },
+//     { distance_meters: 400, elevation_meters: 326 },
+//     { distance_meters: 800, elevation_meters: 341 },
+//     { distance_meters: 1200, elevation_meters: 335 },
+//     { distance_meters: 1600, elevation_meters: 358 },
+//     { distance_meters: 2000, elevation_meters: 374 },
+//     { distance_meters: 2400, elevation_meters: 366 },
+//     { distance_meters: 2800, elevation_meters: 391 },
+//     { distance_meters: 3200, elevation_meters: 405 },
+//     { distance_meters: 3600, elevation_meters: 398 },
+//     { distance_meters: 4000, elevation_meters: 421 },
+// ]
 
 function formatDistance(value: number, useKilometers: boolean) {
     return useKilometers
@@ -34,8 +34,20 @@ function formatDistance(value: number, useKilometers: boolean) {
 }
 
 export default function ElevationProfile({
-    data = testData,
+    data = [],
 }: ElevationProfileProps) {
+    if (!data || data.length === 0) {
+        return (
+            <div className="w-full rounded-xl border border-white/60 bg-white/60 p-4 text-center shadow-sm backdrop-blur-sm">
+                <h3 className="font-['Luckiest_Guy'] text-lg tracking-wide text-green-700">
+                    Profil wysokościowy
+                </h3>
+                <p className="text-xs text-slate-400">
+                    Wybierz punkty trasy, aby wygenerować wykres
+                </p>
+            </div>
+        )
+    }
     const useKilometers = (data.at(-1)?.distance_meters ?? 0) >= 1000
 
     return (

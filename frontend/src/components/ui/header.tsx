@@ -1,9 +1,9 @@
-import { ArrowRight } from "lucide-react";
+// import { ArrowRight } from "lucide-react";
 export default function Header() {
-    const handleActionClick = () => {
-        console.log("[Header] working");
-        alert("header clicked working");
-    };
+    // const handleActionClick = () => {
+    //     console.log("[Header] working");
+    //     alert("header clicked working");
+    // };
 
     return (
         <header className="absolute top-0 left-0 right-0 z-20 flex w-full items-center justify-between bg-white/10 px-6 py-4 backdrop-blur-md shadow-sm border-b border-white/50">
@@ -13,7 +13,7 @@ export default function Header() {
                     Trail-Strider
                 </h1>
             </div>
-
+            {/*
             <nav aria-label="main navigation">
                 <button
                     onClick={handleActionClick}
@@ -34,7 +34,7 @@ export default function Header() {
                     </div>
                 </button>
             </nav>
-
+*/}
         </header>
     );
 }

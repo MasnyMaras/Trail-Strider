@@ -254,7 +254,7 @@ export function MapView({ isSidebarOpen, regionId, points, onAddPoint, onRemoveP
                 })
             }
         }
-        
+
         if (map.isStyleLoaded()) {
             updateRoute()
         } else {

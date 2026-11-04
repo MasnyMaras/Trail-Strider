@@ -6,7 +6,7 @@ import Sidebar from "@/components/ui/sidebar"
 import TrailPreferences from "@/components/ui/trail_preferences"
 import SaveRoute from "@/components/ui/save_route"
 import NotFound from "@/components/ui/not_found"
-import SearchBar from "@/components/ui/search_bar";
+//import SearchBar from "@/components/ui/search_bar";
 import ElevationProfile from "@/components/ui/elevation_profile.tsx";
 import { calculateRoute } from "@/api/routes"
 import { useEffect, useState, useCallback } from "react";
@@ -197,7 +197,7 @@ export function App() {
                     <NotFound onGoHome={handleGoHome} />
                 ) : (
                     <>
-                        <SearchBar isSidebarOpen={isSidebarOpen} />
+                        {/*<SearchBar isSidebarOpen={isSidebarOpen} />*/}
                         <MapView
                             isSidebarOpen={isSidebarOpen}
                             regionId="malopolskie" /* SEBKUC [mapa-regiony] na tymczasowo tutaj wybierasz malopolskie/pomorskie/maramures */
@@ -222,7 +222,9 @@ export function App() {
                             routeStats={routeStats}
                             onCalculateRoute={handleCalculateRoute}
                             isRouteLoading={isRouteLoading}
-                            routeError={routeError}/>
+                            routeError={routeError}
+                            elevationProfile={routeResponse?.elevation_profile}
+                        />
                         <TrailPreferences
                             isOpen={isPreferencesOpen}
                             onClose={() => setIsPreferencesOpen(false)}
