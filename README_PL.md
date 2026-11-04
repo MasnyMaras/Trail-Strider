@@ -8,9 +8,10 @@ Opis katalogów i plików w repozytorium:
 ```
 Trail-Strider/
 ├── backend/            Serwis FastAPI (SQLAlchemy i psycopg); obsługuje punkty końcowe API
-├── db/                 Konfiguracja PostgreSQL/PostGIS oraz osm2pgsql, w tym skrypty ETL importujące punkty noclegowe Lasów Państwowych (BDL) i programu „Zanocuj w lesie” z uwzględnieniem bliskości wody
+├── db/                 Konfiguracja PostgreSQL/PostGIS oraz osm2pgsql, w tym skrypty ETL importujące punkty noclegowe Lasów Państwowych (BDL) i programu „Zanocuj w lesie” z uwzględnieniem bliskości wody,  oraz skrypty SQL tworzące tabelę noclegów 
 ├── docs/               Dokumentacja projektu, przewodniki oraz specyfikacje techniczne
 ├── frontend/           Aplikacja SPA w oparciu o React + TypeScript (Vite)
+├── map/                Lokalne zasoby mapy udostępniane przez serwer kafli Martin: styl mapy, czcionki, ikony oraz konfiguracja Martina
 ├── routing/            Serwis trasowania pieszego integrujący lokalną instancję BRoutera, profile routingu oraz Google OR-Tools do automatycznej optymalizacji kolejności punktów (TSP)
 ├── utils/              Skrypty pomocnicze
 ├── .env.example        Przykładowy plik konfiguracyjny ze zmiennymi środowiskowymi
@@ -34,6 +35,9 @@ Niniejszy projekt integruje różne komponenty open-source. Wszystkie wykorzysta
 | **PostgreSQL**            | PostgreSQL License                                                       |
 | **PostGIS**               | GPLv2+                                                                   |
 | **osm2pgsql**             | GNU GPL v2                                                               |
+| **osmium-tool**           | GNU GPL v3                                                               |
+| **Planetiler**            | Apache 2.0                                                               |
+| **Martin**                | Apache 2.0 / MIT                                                         |
 | **React**                 | MIT                                                                      |
 | **TypeScript**            | Apache 2.0                                                               |
 | **Vite**                  | MIT                                                                      |
