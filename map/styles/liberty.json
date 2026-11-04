@@ -13,9 +13,9 @@
       "type": "vector",
       "url": "http://localhost:3000/map_regions"
     },
-    "trails": {
+    "trail_segments": {
       "type": "vector",
-      "url": "http://localhost:3000/trails"
+      "url": "http://localhost:3000/trail_segments"
     }
   },
   "sprite": "http://localhost:3000/sprite/ofm",
@@ -4161,8 +4161,8 @@
     {
       "id": "trails",
       "type": "line",
-      "source": "trails",
-      "source-layer": "trails",
+      "source": "trail_segments",
+      "source-layer": "trail_segments",
       "minzoom": 11,
       "layout": {"line-cap": "round", "line-join": "round"},
       "paint": {
@@ -4170,7 +4170,10 @@
           "red", "#e2001a", "blue", "#0060c0", "green", "#00913f", "yellow", "#f2c500", "black", "#222222",
           "purple", "#7b2c8f", "brown", "#8b5a2b", "orange", "#f08c00",
           "#888888"],
-        "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.0, 16, 2.0]
+        "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.5, 16, 3, 20, 8],
+        "line-offset": ["let", "k", ["-", ["get", "i"], ["/", ["+", ["get", "n"], 1], 2]],
+          ["interpolate", ["linear"], ["zoom"],
+            11, ["*", ["var", "k"], 2.25], 16, ["*", ["var", "k"], 4.5], 20, ["*", ["var", "k"], 12]]]
       }
     },
     {

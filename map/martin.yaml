@@ -30,6 +30,16 @@ postgres:
       properties:
         name: text
         color: text            # kolor szlaku (red, blue, ...; pusty = brak koloru)
+    trail_segments:            # szlaki pocięte na wspólne odcinki (db/sql/trails.sql)
+      schema: app
+      table: trail_segments
+      srid: 3857
+      geometry_column: geom
+      buffer: 256                # zapas danych zza krawędzi kafla (domyślnie 64): przesunięte linie nie urywają się
+      properties:
+        color: text
+        i: int4                # numer koloru na odcinku (1..n)
+        n: int4                # liczba kolorów na odcinku
 
 # podkład: każdy plik *.mbtiles z folderu to osobne źródło (nazwa = nazwa pliku)
 mbtiles:

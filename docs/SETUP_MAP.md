@@ -54,6 +54,9 @@ ls map
 | do bazy zaimportowałeś **całą Rumunię** (wcześniejsza wersja SETUP) | krok 16 – przeczytaj uwagi w krokach 16, 18, 22b i 23b |
 | część 1 masz już wykonaną (3 regiony w bazie, Maramureș wycięty, krok 22c zgodny) | krok 25 |
 
+ℹ️ Krok 32 (szlaki) dodano 4.11.2026. Robiąc instrukcję od początku, w kroku 25 zobaczysz `113` warstw i dodatkowe
+źródło `trail_segments`, a w kroku 28 ostrzeżenia `WARN` o brakujących tabelach `app.trails` i `app.trail_segments`
+– to oczekiwane, znikają po kroku 32.
 
 ---
 
@@ -1234,6 +1237,147 @@ git status --short
 
 ---
 
+# CZĘŚĆ 3. Szlaki turystyczne (krok 32)
+
+Dodane 4.11.2026. Na mapie pojawiają się szlaki piesze z OSM w swoich kolorach; tam, gdzie jedną ścieżką biegnie
+kilka szlaków, linie są rysowane obok siebie. Przy okazji nazwy na mapie są teraz polskie (np. `Kraków`).
+
+ℹ️ Jeśli przeszedłeś już kroki 16–31: zrób `git pull` (baza i Martin mogą przy tym działać) i wykonaj tylko krok 32.
+
+
+---
+
+## Krok 32. Szlaki
+
+### 32a. Tabele szlaków (`db/sql/trails.sql`)
+
+Skrypt tworzy w schemacie `app` dwie tabele ze szlakami pieszymi z OSM (relacje `route=hiking` z tabeli `routes`),
+przyciętymi do trzech regionów:
+- `app.trails` – jeden wiersz na szlak: nazwa i kolor,
+- `app.trail_segments` – szlaki pocięte na odcinki; każdy kolor na odcinku to osobny wiersz z numerem `i`
+  i liczbą kolorów `n`. Z tej tabeli styl rysuje szlaki.
+
+**Sprawdź przed:**
+```bash
+docker compose ps db
+ls db/sql
+```
+**Wymagane:** `trail-strider-db-1` ze statusem `Up ... (healthy)`; `ls db/sql` pokazuje
+`map_regions.sql  noclegi.sql  trails.sql  zanocuj_punkty.sql`; krok 27 jest wykonany.
+
+**Wykonaj:**
+```bash
+time docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/trails.sql
+```
+Całość jest jedną transakcją: przy błędzie baza zostaje bez zmian.
+
+**Wymagane (cały wynik):**
+```
+BEGIN
+DROP TABLE
+psql:<stdin>:8: NOTICE:  table "trails" does not exist, skipping
+SELECT 917
+DELETE 3
+CREATE INDEX
+DROP TABLE
+psql:<stdin>:28: NOTICE:  table "trail_segments" does not exist, skipping
+SELECT 6927
+CREATE INDEX
+         region          | trails | with_color |  km
+-------------------------+--------+------------+------
+ Maramureș               |     80 |         79 | 1269
+ województwo małopolskie |    701 |        682 | 7523
+ województwo pomorskie   |    133 |        128 | 3994
+(3 rows)
+
+ color  | count
+--------+-------
+ green  |   191
+ blue   |   190
+ yellow |   170
+ red    |   162
+ black  |   161
+        |    25
+ purple |     6
+ brown  |     3
+ white  |     3
+ orange |     3
+(10 rows)
+
+         region          | n | lines |  km
+-------------------------+---+-------+------
+ Maramureș               | 1 |   373 | 1055
+ Maramureș               | 2 |   190 |   85
+ Maramureș               | 3 |    15 |    7
+ województwo małopolskie | 1 |  1822 | 4374
+ województwo małopolskie | 2 |  1520 | 1021
+ województwo małopolskie | 3 |   966 |  181
+ województwo małopolskie | 4 |   532 |   21
+ województwo małopolskie | 5 |    30 |    1
+ województwo małopolskie | 6 |    42 |    2
+ województwo pomorskie   | 1 |   724 | 2807
+ województwo pomorskie   | 2 |   502 |  486
+ województwo pomorskie   | 3 |   162 |   51
+ województwo pomorskie   | 4 |    44 |    6
+ województwo pomorskie   | 5 |     5 |    0
+(14 rows)
+
+COMMIT
+```
+- `DELETE 3` – szlaki stykające się z regionem tylko w jednym punkcie,
+- `km` w pierwszej tabeli to suma długości szlaków (wspólny odcinek liczony tyle razy, ile szlaków nim biegnie);
+  w ostatniej – długość ścieżek (każda raz) według liczby kolorów `n`,
+- wiersze `brown`, `white`, `orange` (po 3) mogą być w innej kolejności; komunikaty `NOTICE` są normalne
+  (przy ponownym uruchomieniu ich nie ma),
+- `real` z `time` – u autora ok. 38 s.
+
+❌ `ROLLBACK` albo `ERROR` – zatrzymaj się i zgłoś.
+
+### 32b. Martin
+
+`map/martin.yaml` publikuje teraz także tabele `app.trails` i `app.trail_segments`. Martin czyta ten plik tylko
+przy starcie.
+
+**Wykonaj:**
+```bash
+docker compose restart martin
+```
+
+**Sprawdź po** (po ok. 30 s):
+```bash
+docker compose ps martin
+docker compose logs martin --tail 20 | grep -E "WARN|ERROR|Published|now active"
+curl -s localhost:3000/catalog | python3 -c "import json,sys; print(sorted(json.load(sys.stdin)['tiles']))"
+curl -s localhost:3000/trail_segments; echo
+curl -s -o /dev/null -w "%{http_code}  %{size_download} B\n" http://localhost:3000/trail_segments/11/1137/701
+```
+
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| `ps` | `Up ... (healthy)` |
+| logi | `Published source` dla `map_mask`, `map_regions`, `trails`, `trail_segments` oraz `Martin server is now active`; **żadnej** linii z `WARN` ani `ERROR` |
+| katalog | `['malopolskie', 'map_mask', 'map_regions', 'maramures', 'pomorskie', 'trail_segments', 'trails']` |
+| `/trail_segments` | `"vector_layers"` z `"id":"trail_segments"` i polami `color`, `i`, `n` |
+| kafel z Tatrami | `200` i rozmiar większy od 0 |
+
+❌ Martin nie jest `healthy` albo w logach jest `WARN`/`ERROR` – zatrzymaj się i zgłoś (dołącz `docker compose logs martin`).
+
+### 32c. Przeglądarka
+
+Otwórz `http://localhost:5173` i odśwież stronę: `Ctrl+Shift+R`.
+
+**Wymagane:**
+| co | musi być |
+|---|---|
+| nazwy | polskie, np. `Kraków` (nie `Krakow`) |
+| szlaki | od przybliżenia ok. 11 (mniej więcej widok całych Tatr) kolorowe linie szlaków; gdzie jedną ścieżką biegnie kilka szlaków – linie obok siebie, z przerwami między kolorami |
+
+✅ **Gotowe.** Mapa pokazuje szlaki turystyczne we wszystkich trzech regionach.
+
+
+---
+
 ## Codzienna praca
 
 ```bash
@@ -1249,7 +1393,6 @@ Aplikacja: `http://localhost:5173`. Koniec pracy: `docker compose stop`.
 
 - Widać napisy i ikonki części obiektów spoza regionu: pliki Małopolski i Pomorza z Geofabrik zawierają pas
   terenu za granicą województwa, a napisy są rysowane nad maską.
-- Część nazw jest po angielsku (np. `Krakow`) – styl wybiera najpierw nazwę angielską (`name_en`).
 - Ostrzeżenia w konsoli przeglądarki z kroku 29a.
 - Trasy z BRoutera nie są ograniczone do regionu.
 
@@ -1289,6 +1432,26 @@ styles/liberty.json, fonts/*.ttf, sprites/ofm/*.svg ─────────�
 | **maska i obrys** | tabele z kroku 27. `bounds` maski są wpisane ręcznie w `map/martin.yaml`: maska sięga krawędzi świata, a liczone automatycznie wychodzą odwrócone (zawinięcie długości geograficznej przy 180°) i przeglądarka nie pobierałaby kafli maski |
 | **frontend** | po wyborze regionu pobiera jego TileJSON z Martina, ustawia widok na cały region (z marginesem na nagłówek), blokuje widok do tego obszaru i podmienia w stylu źródło kafli na wybrany region. Maska i obrys są wspólne dla wszystkich regionów |
 
+### Szlaki (krok 32)
+
+- **dane:** relacje `route=hiking` z tabeli `routes` (import osm2pgsql), przycięte do `app.map_regions` – dlatego
+  krok 32 wymaga kroku 27,
+- **kolor:** pierwszy człon `osmc:symbol` (np. `red:white:red_bar` → `red`), a gdy go brak – tag `colour`;
+  szlaki bez koloru i białe styl rysuje na szaro,
+- **wspólne odcinki:** szlaki idące tą samą ścieżką mają w OSM te same punkty. Skrypt tnie wszystkie szlaki
+  na najkrótsze odcinki (między kolejnymi punktami), grupuje identyczne i zapisuje, jakie kolory biegną każdym
+  odcinkiem (dwa szlaki tego samego koloru dają jedną linię). Sąsiednie odcinki z tym samym zestawem kolorów są
+  sklejane w dłuższe linie – tak powstaje `app.trail_segments` (`color`, `i`, `n`),
+- **styl** (warstwa `trails`, od przybliżenia 11): `line-offset` przesuwa linię w bok o `(i − (n+1)/2)` odstępów;
+  odstęp to ok. 1,33 × grubość linii, więc między kolorami zostaje przerwa. Przesunięcie liczy się względem
+  kierunku linii (wszystkie są ustawione z zachodu na wschód), dlatego na skrzyżowaniach kolory czasem zamieniają
+  się stronami,
+- **`buffer: 256`** (źródło `trail_segments` w `map/martin.yaml`): kafel zawiera dane do 1/16 swojej szerokości
+  za krawędzią (domyślnie 1/64). Przy mniejszym zapasie przesunięte linie urywały się na krawędziach kafli przy
+  dużym przybliżeniu,
+- **`app.trails`** (jeden wiersz na szlak, z nazwą) – styl jej na razie nie używa; Martin publikuje ją na później
+  (np. nazwa szlaku po kliknięciu).
+
 ### Zmiany w plikach mapy
 
 - **styl** (`map/styles/liberty.json`): zapisz plik i odśwież przeglądarkę (`Ctrl+Shift+R`) – Martin czyta styl
@@ -1305,6 +1468,7 @@ styles/liberty.json, fonts/*.ttf, sprites/ofm/*.svg ─────────�
 | `map/fonts/` | Noto Sans Regular, Bold, Italic (wersja 2.015) + licencja `OFL.txt` |
 | `map/sprites/ofm/` | 264 ikonki SVG zestawu OpenFreeMap; licencje w `map/sprites/LICENSE.md` |
 | `db/sql/map_regions.sql` | obrysy regionów i maska (krok 27) |
+| `db/sql/trails.sql` | szlaki: tabele `app.trails` i `app.trail_segments` (krok 32) |
 | `frontend/src/components/map/Regions.ts` | lista regionów i adres Martina |
 | `frontend/src/components/map/MapView.tsx`, `frontend/src/App.tsx` | wyświetlanie regionu i ograniczenie widoku (zmiany oznaczone komentarzem `[mapa-regiony]`) |
 
