@@ -9,7 +9,7 @@ import NotFound from "@/components/ui/not_found"
 import SearchBar from "@/components/ui/search_bar";
 import ElevationProfile from "@/components/ui/elevation_profile.tsx";
 import { calculateRoute } from "@/api/routes"
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { RoutePoint, RouteResponse } from "@/types/route"
 
 export interface RoutePreferences {
@@ -111,13 +111,14 @@ export function App() {
         alert(`Pobieranie GPX.`);
     };
 
-    const handleCalculateRoute = async () => {
+    const handleCalculateRoute = useCallback(async () => {
         const coordinates = points
             .map((point) => point.coordinates)
             .filter((coordinate): coordinate is [number, number] => coordinate !== undefined)
 
         if (coordinates.length < 2) {
             setRouteError("Wybierz co najmniej dwa punkty trasy.")
+            setRouteResponse(null)
             return
         }
 
@@ -140,7 +141,21 @@ export function App() {
         } finally {
             setIsRouteLoading(false)
         }
-    }
+    },[points, isAutoMode])
+
+    useEffect(() => {
+        const validCoords = points.filter(p => p.coordinates !== undefined);
+
+        const timeoutId = setTimeout(() => {
+            if (validCoords.length >= 2) {
+                void handleCalculateRoute();
+            } else {
+                setRouteResponse(null);
+            }
+        }, 400);
+
+        return () => clearTimeout(timeoutId);
+    }, [points, isAutoMode, handleCalculateRoute]);
 
     const [currentPath, setCurrentPath] = useState(
         () => window.location.pathname.replace(/\/+$/, "") || "/"
@@ -185,10 +200,12 @@ export function App() {
                         <SearchBar isSidebarOpen={isSidebarOpen} />
                         <MapView
                             isSidebarOpen={isSidebarOpen}
-                            regionId="malopolskie" /* SEBKUC [mapa-regiony] na tymczasowo tutaj wybierasz malopolskie/pomorskie/maramures */
+                            regionId="pomorskie" /* SEBKUC [mapa-regiony] na tymczasowo tutaj wybierasz malopolskie/pomorskie/maramures */
                             points={points}
                             onAddPoint={handleAddPoint}
-                            onRemovePoint={handleRemovePoint}/>
+                            onRemovePoint={handleRemovePoint}
+                            routeGeoJson={routeResponse?.route}
+                        />
                         <Sidebar
                             isOpen={isSidebarOpen}
                             onToggle={() => setIsSidebarOpen(!isSidebarOpen)}

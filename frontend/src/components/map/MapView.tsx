@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react"
 // import { Map, NavigationControl, setWorkerUrl, Popup, Marker } from "maplibre-gl"    // SEBKUC
-import { Map, NavigationControl, setWorkerUrl, Popup, Marker, type VectorTileSource } from "maplibre-gl" // SEBKUC [mapa-regiony]
+import { Map, NavigationControl, setWorkerUrl, Popup, Marker, type VectorTileSource, type GeoJSONSource } from "maplibre-gl" // SEBKUC [mapa-regiony]
 import "maplibre-gl/dist/maplibre-gl.css"
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"
 import { ScaleControl } from "./Scale"
 import { MARTIN_URL, type RegionId } from "./Regions" // SEBKUC [mapa-regiony]
-import type { RoutePoint } from "@/types/route"
+import type { RoutePoint, RouteGeoJson } from "@/types/route"
 
 setWorkerUrl(maplibreWorkerUrl)
 interface MapViewProps {
@@ -14,6 +14,7 @@ interface MapViewProps {
     points: RoutePoint[]
     onAddPoint: (coords: [number, number], mode: "start" | "end" | "middle") => void
     onRemovePoint: (id: string) => void
+    routeGeoJson?: RouteGeoJson
 }
 
 // SEBKUC
@@ -28,7 +29,7 @@ interface MapViewProps {
 //     }, [points])
 
 // SEBKUC
-export function MapView({ isSidebarOpen, regionId, points, onAddPoint, onRemovePoint }: MapViewProps) { // [mapa-regiony]
+export function MapView({ isSidebarOpen, regionId, points, onAddPoint, onRemovePoint, routeGeoJson }: MapViewProps) { // [mapa-regiony]
     const mapContainerRef = useRef<HTMLDivElement>(null)
     const mapRef = useRef<Map | null>(null)
     const activeMarkersRef = useRef<Marker[]>([])
@@ -219,6 +220,47 @@ export function MapView({ isSidebarOpen, regionId, points, onAddPoint, onRemoveP
             activeMarkersRef.current.push(marker)
         })
     }, [points, onRemovePoint])
+
+    useEffect(() => {
+        const map = mapRef.current
+        if (!map) return
+
+        const sourceId = "route-source"
+        const layerId = "route-layer"
+
+        const updateRoute = () => {
+            const data = routeGeoJson || { type: "FeatureCollection", features: [] }
+            const source = map.getSource(sourceId) as GeoJSONSource | undefined
+            if (source) {
+                source.setData(data)
+            } else {
+                map.addSource(sourceId, {
+                    type: "geojson",
+                    data: data
+                })
+                map.addLayer({
+                    id: layerId,
+                    type: "line",
+                    source: sourceId,
+                    layout: {
+                        "line-join": "round",
+                        "line-cap": "round"
+                    },
+                    paint: {
+                        "line-color": "#15803d",
+                        "line-width": 4,
+                        "line-opacity": 0.8
+                    }
+                })
+            }
+        }
+        
+        if (map.isStyleLoaded()) {
+            updateRoute()
+        } else {
+            map.once("styledata", updateRoute)
+        }
+    }, [routeGeoJson])
 
     useEffect(() => {
         const rightControls = document.querySelectorAll('.maplibregl-ctrl-top-right');
