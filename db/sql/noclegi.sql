@@ -76,6 +76,9 @@ WHERE o.zrodlo = 'osm' AND l.zrodlo = 'lp'
 INSERT INTO app.noclegi (zrodlo, zrodlo_id, rodzaj, nazwa, super, woda_rodzaj, woda_odl_m, geom)
 SELECT 'zanocuj', id::text, 'zanocuj_w_lesie', NULL, super, woda_rodzaj, woda_odl_m, geom
 FROM bdl.zanocuj_punkty;
+INSERT INTO app.noclegi (zrodlo, zrodlo_id, rodzaj, super, woda_odl_m, geom)
+SELECT 'dziko', id::text, 'dziko', true, woda_odl_m, geom
+FROM app.dziko_punkty;
 CREATE TEMP TABLE t_regiony ON COMMIT DROP AS
 SELECT ST_BuildArea(geom) AS geom
 FROM boundaries
