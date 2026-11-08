@@ -76,6 +76,9 @@ WHERE o.zrodlo = 'osm' AND l.zrodlo = 'lp'
 INSERT INTO app.noclegi (zrodlo, zrodlo_id, rodzaj, nazwa, super, woda_rodzaj, woda_odl_m, geom)
 SELECT 'zanocuj', id::text, 'zanocuj_w_lesie', NULL, super, woda_rodzaj, woda_odl_m, geom
 FROM bdl.zanocuj_punkty;
+-- nocleg na dziko (Maramureș, db/scripts/dziko_punkty.py); bez tego skryptu tabela jest pusta
+CREATE TABLE IF NOT EXISTS app.dziko_punkty (id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    woda_odl_m real NOT NULL, geom geometry(Point, 3857) NOT NULL);
 INSERT INTO app.noclegi (zrodlo, zrodlo_id, rodzaj, super, woda_odl_m, geom)
 SELECT 'dziko', id::text, 'dziko', true, woda_odl_m, geom
 FROM app.dziko_punkty;

@@ -6,6 +6,8 @@ Instrukcja ma dwie części:
 - **Część 2 (kroki 25–31): lokalna mapa.** Mapa w aplikacji działa bez internetu i bez zewnętrznych serwerów.
   Kafle mapy powstają z tych samych plików OSM co baza (program **Planetiler**), a przeglądarce podaje je lokalny
   serwer kafli **Martin** (usługa `martin` w `compose.yaml`). Styl mapy, czcionki i ikonki są w repozytorium (`map/`).
+- **Część 3 (krok 32): szlaki turystyczne na mapie.**
+- **Część 4 (krok 33): noclegi na dziko w Maramureșu** – z modelu terenu Copernicus i danych OSM.
 
 Dokładny opis działania jest na końcu („Jak to działa”).
 
@@ -584,7 +586,7 @@ docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/no
 **Wymagane (końcówka wyniku):**
 | tabelka | musi pokazać |
 |---|---|
-| `INSERT` / `DELETE` / `SELECT` | `INSERT 0 6721` (OSM), `INSERT 0 516` (LP), `DELETE 18` (duplikaty biwaków), `INSERT 0 723` (zanocuj), `SELECT 3` (obrysy trzech regionów), `DELETE 542` (noclegi spoza regionów) |
+| `INSERT` / `DELETE` / `SELECT` | `INSERT 0 6721` (OSM), `INSERT 0 516` (LP), `DELETE 18` (duplikaty biwaków), `INSERT 0 723` (zanocuj), `CREATE TABLE` i `INSERT 0 0` (nocleg na dziko – pusto do kroku 33), `SELECT 3` (obrysy trzech regionów), `DELETE 542` (noclegi spoza regionów) |
 | podsumowanie | 11 wierszy; `lp`: `miejsce_biwakowe 61`, `kwatera 28`, `pole_namiotowe 1`; `osm`: `kwatera 4285`, `hotel 1594`, `pole_namiotowe 366`, `hostel 302`, `schronisko 46`, `chatka 21`, `miejsce_biwakowe 20`; `zanocuj`: `zanocuj_w_lesie 676` |
 | ostatnia linia | `COMMIT` |
 
@@ -596,6 +598,10 @@ docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/no
 
 ℹ️ LP może się różnić o 1 (`INSERT 0 517`) – z tego samego powodu co w kroku 16; wtedy `DELETE 542` i liczby `lp`
 mogą się różnić o 1.
+
+ℹ️ Noclegi na dziko w Maramureșu dochodzą w kroku 33 (część 4). Jeśli masz już wykonany krok 33, zamiast
+`CREATE TABLE` / `INSERT 0 0` zobaczysz `NOTICE: relation "dziko_punkty" already exists, skipping` i `INSERT 0 170`,
+a wyniki jak w kroku 33d.
 
 **Sprawdź po – noclegi według regionów i w całej tabeli:**
 ```bash
@@ -1378,6 +1384,136 @@ Otwórz `http://localhost:5173` i odśwież stronę: `Ctrl+Shift+R`.
 
 ---
 
+# CZĘŚĆ 4. Noclegi na dziko w Maramureșu (krok 33)
+
+Dodane 8.11.2026. W Maramureșu nie ma programu „Zanocuj w lesie” ani danych Lasów Państwowych, więc miejsca na
+nocleg na dziko wyznacza skrypt `db/scripts/dziko_punkty.py`. Punkt musi spełniać wszystkie warunki:
+- leży na ścieżce lub drodze leśnej z OSM (`track`, `path`, `footway`, `bridleway`) – kandydaci co 100 m,
+- leży w lesie (`landuse=forest` lub `natural=wood`) – w koncepcji projektu wszystkie noclegi w lesie w Rumunii
+  traktujemy jako legalne,
+- nie leży w parku narodowym ani rezerwacie ścisłym (klasa ochrony 1 i 2 – namiot tylko w miejscach wyznaczonych),
+- w promieniu 200 m nie ma budynków ani terenów zabudowanych,
+- woda (źródło, rzeka, strumień, zbiornik) jest nie dalej niż 200 m,
+- nachylenie terenu jest mniejsze niż 5° (wymaganie z koncepcji projektu).
+
+Z każdego kwadratu ok. 2,2 × 2,2 km (5 km²) zostaje jeden punkt – najbliżej wody.
+
+Nachylenie pochodzi z numerycznego modelu terenu **Copernicus DEM GLO-30** (oczko ok. 30 m); mapę nachylenia
+liczy skrypt `utils/slope_map.py`. Odległości są liczone w układzie **EPSG:3844** (Stereo70) – metry w Rumunii,
+odpowiednik EPSG:2180 w Polsce.
+
+**Co musi być spełnione przed tą częścią:** kroki 22 (Maramureș w bazie) i 24 (`app.noclegi`); działa baza
+(`docker compose ps db` – `Up ... (healthy)`); ok. 0,5 GB wolnego miejsca na dysku.
+
+
+---
+
+## Krok 33. Noclegi na dziko
+
+### 33a. Model terenu (Copernicus DEM GLO-30)
+
+Maramureș razem z marginesem ze skryptu `utils/slope_map.py` (długość 22,9–25,3°, szerokość 47,3–48,05°) to 8 kafli
+1° × 1°. Kafle są publiczne (serwer Copernicus na Amazon S3), bez konta.
+
+**Wykonaj:**
+```bash
+mkdir -p data/dem
+for la in 47 48; do
+  for lo in 022 023 024 025; do
+    n=Copernicus_DSM_COG_10_N${la}_00_E${lo}_00_DEM
+    wget -nv -P data/dem https://copernicus-dem-30m.s3.amazonaws.com/$n/$n.tif
+  done
+done
+ls -lh data/dem
+```
+Pętla składa nazwę każdego kafla (np. `N47_00_E023_00`) i pobiera go. Pliki `.tif` są w `.gitignore`.
+
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| `wget` | 8 linii `URL:... [x/x] -> "data/dem/Copernicus_DSM_COG_10_N.._00_E..._00_DEM.tif"` (obie liczby w nawiasie równe – plik kompletny) |
+| `ls -lh data/dem` | 8 plików `.tif` po 41–43M, `total 331M`; data plików `May  9  2022` (data wydania kafli) |
+
+❌ Błąd połączenia (`No route to host`, `Connection timed out`) – zatrzymaj się i zgłoś; pliki może przekazać ktoś z zespołu.
+
+### 33b. Mapa nachylenia
+
+`utils/slope_map.py` skleja kafle, przelicza je do EPSG:3844 z oczkiem 30 m i liczy nachylenie w stopniach (metoda
+Horna – z różnic wysokości między 8 sąsiednimi pikselami). Potrzebuje biblioteki `rasterio` (doszła do
+`db/scripts/requirements.txt`).
+
+**Wykonaj:**
+```bash
+source db/.venv/bin/activate
+pip install -r db/scripts/requirements.txt
+python utils/slope_map.py --region maramures --dem-dir data/dem --out data/slope_maramures.tif
+ls -lh data/slope_maramures.tif
+```
+
+**Wymagane:**
+| komenda | musi pokazać |
+|---|---|
+| `pip install` | na końcu `Successfully installed ... rasterio-1.5.2 ...` (albo same `Requirement already satisfied`) |
+| `slope_map.py` | `Mozaic: (1, 2844, 8784)`; `Saved: data/slope_maramures.tif: 6153x2999, min=0.0° median=13.0° max=60.4°`; ` >15°: 43.7%, >20°: 28.9%, <5°: 22.0%` |
+| `ls -lh` | ok. **61M** |
+
+ℹ️ Komentarz na górze `utils/slope_map.py` podaje nazwę `utils/slope.py` – plik nazywa się `slope_map.py`.
+
+### 33c. Punkty (`db/scripts/dziko_punkty.py`)
+
+**Wykonaj:**
+```bash
+python db/scripts/dziko_punkty.py
+```
+Skrypt tworzy w bazie tabele tymczasowe (woda, zabudowa, las, parki), wybiera punkty na ścieżkach spełniające
+warunki z bazy, odczytuje nachylenie w każdym z nich z `data/slope_maramures.tif`, wybiera jeden punkt na kwadrat
+i zapisuje wynik od nowa w `app.dziko_punkty` (`id`, `woda_odl_m`, `geom`).
+
+**Wymagane (cały wynik):**
+```
+punkty w lesie z wodą: 4056
+  w tym z nachyleniem < 5stopni: 410
+app.dziko_punkty: 170
+```
+- pierwsza liczba – punkty na ścieżkach w lesie, poza parkami i zabudową, z wodą do 200 m,
+- druga – z nich te z nachyleniem < 5°,
+- trzecia – po wybraniu jednego punktu na kwadrat.
+
+❌ `FileNotFoundError: data/slope_maramures.tif` – wróć do 33b. `ModuleNotFoundError: rasterio` – venv nie jest
+włączony (`source db/.venv/bin/activate`) albo nie wykonano `pip install` z 33b.
+
+### 33d. Wspólna tabela noclegów
+
+**Wykonaj:**
+```bash
+docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/noclegi.sql
+```
+
+**Wymagane (końcówka wyniku):**
+| tabelka | musi pokazać |
+|---|---|
+| `INSERT` / `DELETE` | jak w kroku 24, ale `NOTICE: relation "dziko_punkty" already exists, skipping`, `INSERT 0 170` (dziko) i `DELETE 546` (o 4 więcej niż w kroku 24 – punkty dziko tuż za granicą okręgu) |
+| podsumowanie | 12 wierszy – jak w kroku 24 plus wiersz `dziko`, `dziko`, `166` |
+| ostatnia linia | `COMMIT` |
+
+ℹ️ Przy LP `517` (krok 24) jest `DELETE 547`.
+
+**Sprawdź po:**
+```bash
+docker compose exec db psql -U osm -d osm -P pager=off -c "SELECT zrodlo, count(*) FROM app.noclegi GROUP BY 1 ORDER BY 1;"
+```
+**Wymagane:** `dziko 166`, `lp 90`, `osm 6634`, `zanocuj 676`.
+
+Backend korzysta z nich od razu (`/api/plan`, filtr `types: ["dziko"]`), restart nie jest potrzebny.
+
+✅ **Gotowe.** Maramureș ma noclegi z OSM i 166 miejsc na nocleg na dziko.
+
+**Kolejność po zmianach danych:** zmiana danych OSM (krok 22) → `dziko_punkty.py` (33c) → `noclegi.sql` (33d).
+Pliki `data/dem/` i `data/slope_maramures.tif` zostaw – bez nich nie da się ponownie wykonać kroku 33c.
+
+
+---
+
 ## Codzienna praca
 
 ```bash
@@ -1395,6 +1531,9 @@ Aplikacja: `http://localhost:5173`. Koniec pracy: `docker compose stop`.
   terenu za granicą województwa, a napisy są rysowane nad maską.
 - Ostrzeżenia w konsoli przeglądarki z kroku 29a.
 - Trasy z BRoutera nie są ograniczone do regionu.
+- Krok 33: granica Parku Narodowego Munții Rodnei jest w danych niepełna (park leży głównie poza Maramureșem),
+  więc nie jest wycinany z noclegów na dziko. Teren parku jest stromy, a punkty wymagają nachylenia < 5°.
+- Krok 33: Copernicus GLO-30 to model powierzchni (z koronami drzew), więc w lesie nachylenie jest przybliżone.
 
 
 ---
@@ -1469,6 +1608,8 @@ styles/liberty.json, fonts/*.ttf, sprites/ofm/*.svg ─────────�
 | `map/sprites/ofm/` | 264 ikonki SVG zestawu OpenFreeMap; licencje w `map/sprites/LICENSE.md` |
 | `db/sql/map_regions.sql` | obrysy regionów i maska (krok 27) |
 | `db/sql/trails.sql` | szlaki: tabele `app.trails` i `app.trail_segments` (krok 32) |
+| `utils/slope_map.py` | mapa nachylenia z Copernicus GLO-30 (krok 33b) |
+| `db/scripts/dziko_punkty.py` | noclegi na dziko w Maramureșu: tabela `app.dziko_punkty` (krok 33c) |
 | `frontend/src/components/map/Regions.ts` | lista regionów i adres Martina |
 | `frontend/src/components/map/MapView.tsx`, `frontend/src/App.tsx` | wyświetlanie regionu i ograniczenie widoku (zmiany oznaczone komentarzem `[mapa-regiony]`) |
 
@@ -1481,6 +1622,8 @@ styles/liberty.json, fonts/*.ttf, sprites/ofm/*.svg ─────────�
 | osmium-tool | `1.16.0-1build1` (Ubuntu 24.04) |
 | MapLibre GL JS (frontend) | `6.14.0` |
 | dane OSM | Geofabrik, `261001` (stan z 1.10.2026) |
+| model terenu | Copernicus DEM GLO-30 (kafle COG z `copernicus-dem-30m.s3.amazonaws.com`, wydanie 2022) |
+| rasterio | `1.5.2` (`db/scripts/requirements.txt`) |
 | czcionki Noto Sans | 2.015, repozytorium `notofonts/notofonts.github.io`, commit `5c82cef0a8f08806f932062e18c02be62be278f0` |
 | ikonki i styl | repozytorium `hyperknot/openfreemap-styles`, commit `006ea5796803ba2df4330888836cb0a8f17473b4` |
 
@@ -1498,5 +1641,7 @@ styles/liberty.json, fonts/*.ttf, sprites/ofm/*.svg ─────────�
 | czcionki Noto Sans | SIL Open Font License 1.1 (`map/fonts/OFL.txt`) |
 | ikonki (Maki) | CC0 1.0 |
 | Natural Earth | domena publiczna |
+| Copernicus DEM GLO-30 | licencja Copernicus (dowolne użycie, także komercyjne) – wymagany dopisek `© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved` |
+| rasterio | BSD 3-Clause |
 
 Oba wymagane dopiski wyświetla mapa pod przyciskiem ⓘ (krok 29a).
