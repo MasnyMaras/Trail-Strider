@@ -48,6 +48,11 @@ export default function ElevationProfile({
             </div>
         )
     }
+    const maxPoints = 100
+    const step = Math.max(1, Math.ceil(data.length / maxPoints))
+    const sampledData = data.length > maxPoints
+        ? data.filter((_, idx) => idx % step === 0 || idx === data.length - 1)
+        : data
     const useKilometers = (data.at(-1)?.distance_meters ?? 0) >= 1000
 
     return (
@@ -63,7 +68,7 @@ export default function ElevationProfile({
             <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
-                        data={data}
+                        data={sampledData}
                         margin={{ top: 8, right: 12, left: 0, bottom: 8 }}
                     >
                         <defs>
