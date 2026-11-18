@@ -6,6 +6,13 @@ from app.routing import create_gpx, brouter_parallel
 from app.utils.spurs import build_with_spurs
 from app.utils.utils import calculate_route_profile, t_din33466
 
+W_L = 0.25
+W_H = 0.25
+W_J = 0.10
+GAMMA = 0.03
+DETOUR_W = 0.10
+MIN_STAGE_FRAC = 0.4
+
 def _route_pair(a, b) -> np.ndarray:
     """One short brouter request."""
     fc = brouter_parallel([list(a), list(b)])
@@ -13,7 +20,7 @@ def _route_pair(a, b) -> np.ndarray:
     return np.array([[c[0], c[1], c[2] if len(c) > 2 else np.nan] for c in coords], dtype=float)
 
 def build_stage_matrix(lengths: np.ndarray, ups: np.ndarray, downs: np.ndarray, db_lodgings: list[dict], tmax: float,
-                       beta: float, level: Literal["b", "i", "a"] = "i",):
+                       beta: float, level: Literal["b", "i", "a"] = "i", lmax=None, hmax=None, tmin=0.0):
     """
     Builds a matrix of possible hiking stages between route points
     and available lodgings.
@@ -63,10 +70,15 @@ def build_stage_matrix(lengths: np.ndarray, ups: np.ndarray, downs: np.ndarray, 
     T[T * (1.0 + beta) > tmax] = np.inf
     T[T < tmin] = np.inf
     lod_idx = np.array([-1] + list(range(len(db_lodgings))) + [-1])[order]
+    T[T * (1.0 + beta) > tmax] = np.inf
+    if lmax: T[dL > lmax] = np.inf
+    if hmax: T[dH_up > hmax] = np.inf
+    if tmin > 0: T[:, :-1][T[:, :-1] < tmin] = np.inf
 
-    return names, idx, T, dL, lod_idx, detour
+    return names, idx, T, dL, lod_idx, detour, dH_up
 
-def partition_dp(times: np.ndarray, t_target: float, n: int, node_pen=None):
+def partition_dp(times: np.ndarray, t_target: float, n: int, node_pen=None, dL=None, l_target=None, dU=None, u_target=None,
+                 w_L=W_L, w_H=W_H, w_J=W_J, gamma=GAMMA):
     """
     Partitions a route into a specified number of stages using dynamic
     programming.
@@ -84,21 +96,39 @@ def partition_dp(times: np.ndarray, t_target: float, n: int, node_pen=None):
         ValueError: If no valid partition exists for the specified number of stages.
     """
     m = times.shape[0]
-    cost = (times / t_target - 1) ** 2      # cost function
+    kbar = 1.0 + gamma * (n - 1) / 2.0
+
+    extra = np.zeros_like(times, dtype=float)
+    if dL is not None and l_target and l_target > 0:
+        extra += w_L * (dL / l_target - 1.0) ** 2
+    if dU is not None and u_target and u_target > 50.0:
+        extra += w_H * (dU / u_target - 1.0) ** 2
     if node_pen is not None:
-        cost = cost + node_pen[None, :]     # penalty (karaK!)
-    #(disp?)
+        extra += node_pen[None, :]
+
     best = np.full((n + 1, m), np.inf)
     best[0, 0] = 0.0
     prev = np.full((n + 1, m), -1, dtype=int)
+    last_t = np.full((n + 1, m), np.nan)
+
     cols = np.arange(m)
 
-    for k in range(1, n + 1):
-        cand = best[k - 1][:, None] + cost
-        i = cand.argmin(axis=0)
-        v = cand[i, cols]
-        best[k] = v
-        prev[k] = np.where(np.isfinite(v), i, -1)
+    with np.errstate(all="ignore"):
+        for k in range(1, n + 1):
+            kex = 1.0 + gamma * (k - 1)
+            Te = times * kex / kbar
+            cost = (Te / t_target - 1.0) ** 2 + extra
+            if w_J > 0 and k >= 2:
+                lt = last_t[k - 1][:, None]  # czas etapu dojścia do a, zależny od wiersza a
+                ok = np.isfinite(lt) & (lt > 0)
+                cost = cost + np.where(ok, w_J * (Te / lt - 1.0) ** 2, 0.0)
+
+            cand = best[k - 1][:, None] + cost
+            i = cand.argmin(axis=0)
+            v = cand[i, cols]
+            best[k] = v
+            prev[k] = np.where(np.isfinite(v), i, -1)
+            last_t[k] = np.where(np.isfinite(v), Te[i, cols], np.nan)
 
     if not np.isfinite(best[n, m - 1]):
         raise ValueError(f"No partition found for {n} days with given parameters.")
@@ -139,10 +169,11 @@ def lodgings(path: dict[str, Any], db_lodgings: list[dict],
     t_din = float(t_din33466(lengths[-1], ups[-1], downs[-1], level))
     t_target = t_din / n
 
-    names, idx, T, dL_mat, lod_idx, detour = build_stage_matrix(lengths, ups, downs, db_lodgings, tmax, beta, level)
-    DETOUR_W = 0.1
+    names, idx, T, dL_mat, lod_idx, detour, dU_mat = build_stage_matrix(lengths, ups, downs, db_lodgings, tmax,
+                                                                        beta, level, tmin=MIN_STAGE_FRAC * t_target)
     node_pen = DETOUR_W * (detour / 1000.0) ** 2
-    bounds, total_cost = partition_dp(T, t_target, n, node_pen)
+    bounds, total_cost = partition_dp(T, t_target, n, node_pen,dL=dL_mat, l_target=lengths[-1] / n,
+                                      dU=dU_mat, u_target=ups[-1] / n)
 
     stops, chosen_lodgings = [], []
     for b in bounds[1:]:
