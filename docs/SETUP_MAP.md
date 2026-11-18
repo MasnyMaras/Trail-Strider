@@ -1514,6 +1514,53 @@ Pliki `data/dem/` i `data/slope_maramures.tif` zostaw – bez nich nie da się p
 
 ---
 
+# CZĘŚĆ 5. Noclegi na mapie (krok 34)
+
+Dodane 18.11.2026. Martin podaje noclegi z `app.noclegi`; na mapie od przybliżenia 12 (nazwy od 15). Ikony:
+łóżko – hotel, kwatera, hostel, schronisko, chatka; namiot – pole namiotowe, miejsce biwakowe; zielony namiot
+w zielonym kole – „Zanocuj w lesie” i nocleg na dziko.
+
+**Co musi być spełnione:** krok 32 (szlaki). Krok 33 nie jest wymagany – bez niego w Maramureșu nie ma noclegów
+na dziko. Jeśli przeszedłeś wcześniejsze kroki: najpierw `git pull` (baza i Martin mogą działać).
+
+
+---
+
+## Krok 34. Noclegi na mapie
+
+**Wykonaj:**
+```bash
+docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/noclegi.sql
+docker compose restart martin
+```
+`noclegi.sql` przebudowuje tabelę noclegów (komentarz tabeli jest teraz w formacie, który czyta Martin); Martin
+czyta nową konfigurację i ikony tylko przy starcie.
+
+**Sprawdź po** (po ok. 30 s):
+```bash
+docker compose logs martin --tail 25 | grep -E "WARN|ERROR"
+curl -s localhost:3000/catalog | python3 -c "import json,sys; print(sorted(json.load(sys.stdin)['tiles']))"
+curl -s localhost:3000/sprite/noclegi.json; echo
+curl -s localhost:3000/noclegi | grep -o '"attribution"'
+```
+
+**Wymagane:**
+| co | musi pokazać |
+|---|---|
+| `noclegi.sql` | na końcu `COMMENT`, podsumowanie jak w kroku 33d (12 wierszy, `dziko 166`; bez kroku 33 – 11 wierszy, bez `dziko`) i `COMMIT` |
+| logi Martina | nic (brak `WARN` i `ERROR`) |
+| katalog | `['malopolskie', 'map_mask', 'map_regions', 'maramures', 'noclegi', 'pomorskie', 'trail_segments', 'trails']` |
+| `sprite/noclegi.json` | `{"campsite_wild":{"height":21,"pixelRatio":1,"width":21,"x":0,"y":0}}` |
+| `attribution` | `"attribution"` |
+| przeglądarka (`Ctrl+Shift+R`) | od przybliżenia 12 ikony noclegów jak w opisie wyżej, od 15 ich nazwy |
+
+❌ `WARN` w logach albo brak `noclegi` w katalogu – zatrzymaj się i zgłoś (dołącz `docker compose logs martin`).
+
+✅ **Gotowe.**
+
+
+---
+
 ## Codzienna praca
 
 ```bash
