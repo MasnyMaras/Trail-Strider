@@ -16,9 +16,16 @@
     "trail_segments": {
       "type": "vector",
       "url": "http://localhost:3000/trail_segments"
+    },
+    "noclegi": {
+      "type": "vector",
+      "url": "http://localhost:3000/noclegi"
     }
   },
-  "sprite": "http://localhost:3000/sprite/ofm",
+  "sprite": [
+    {"id": "default", "url": "http://localhost:3000/sprite/ofm"},
+    {"id": "noclegi", "url": "http://localhost:3000/sprite/noclegi"}
+  ],
   "glyphs": "http://localhost:3000/font/{fontstack}/{range}",
   "layers": [
     {
@@ -4423,7 +4430,8 @@
             "rank"
           ],
           20
-        ]
+        ],
+        ["match", ["get", "class"], ["lodging", "campsite"], false, true]
       ],
       "layout": {
         "icon-image": [
@@ -4528,7 +4536,8 @@
             "rank"
           ],
           20
-        ]
+        ],
+        ["match", ["get", "class"], ["lodging", "campsite"], false, true]
       ],
       "layout": {
         "icon-image": [
@@ -4633,7 +4642,8 @@
             "rank"
           ],
           7
-        ]
+        ],
+        ["match", ["get", "class"], ["lodging", "campsite"], false, true]
       ],
       "layout": {
         "icon-image": [
@@ -5322,6 +5332,32 @@
         "text-halo-blur": 0.5,
         "text-halo-color": "#ffffff",
         "text-halo-width": 1
+      }
+    },
+    {
+      "id": "noclegi",
+      "type": "symbol",
+      "source": "noclegi",
+      "source-layer": "noclegi",
+      "minzoom": 12,
+      "layout": {
+        "icon-image": ["match", ["get", "rodzaj"],
+          ["zanocuj_w_lesie", "dziko"], "noclegi:campsite_wild",
+          ["pole_namiotowe", "miejsce_biwakowe"], "campsite",
+          "lodging"],
+        "text-field": ["step", ["zoom"], "", 15, ["coalesce", ["get", "nazwa"], ""]],
+        "text-font": ["Noto Sans Italic"],
+        "text-size": 12,
+        "text-anchor": "top",
+        "text-offset": [0, 0.6],
+        "text-max-width": 9,
+        "text-optional": true
+      },
+      "paint": {
+        "text-color": "#666",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1,
+        "text-halo-blur": 0.5
       }
     },
     {

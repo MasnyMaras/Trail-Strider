@@ -93,8 +93,13 @@ WHERE NOT EXISTS (SELECT 1 FROM t_regiony r WHERE ST_Intersects(n.geom, r.geom))
 
 CREATE INDEX noclegi_geom_idx ON app.noclegi USING gist (geom);
 ANALYZE app.noclegi;
+--COMMENT ON TABLE app.noclegi IS
+--    'Noclegi dla backendu: OSM (© OpenStreetMap contributors), Lasy Państwowe (BDL), bdl.zanocuj_punkty; db/sql/noclegi.sql';
+
+-- komentarz w formacie JSON: Martin dołącza go do opisu źródła (TileJSON); "attribution" pokazuje się w ⓘ na mapie
 COMMENT ON TABLE app.noclegi IS
-    'Noclegi dla backendu: OSM (© OpenStreetMap contributors), Lasy Państwowe (BDL), bdl.zanocuj_punkty; db/sql/noclegi.sql';
+    '{"description": "Noclegi: OSM, Lasy Państwowe (BDL), Zanocuj w lesie, nocleg na dziko (Maramureș); db/sql/noclegi.sql",
+      "attribution": "© OpenStreetMap contributors, © Lasy Państwowe (BDL), Copernicus DEM GLO-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA"}';
 
 SELECT zrodlo, rodzaj, count(*) AS liczba
 FROM app.noclegi
