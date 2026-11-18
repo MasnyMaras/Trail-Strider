@@ -1,30 +1,17 @@
 import numpy as np
+import copy
 from collections.abc import Sequence
 from typing import Any, Literal
 
 from app.routing import create_gpx, brouter_parallel
-from app.utils.utils import build_distance_matrix, calculate_route_profile, t_din33466
+from app.utils.spurs import build_with_spurs
+from app.utils.utils import calculate_route_profile, t_din33466
 
-def split_indices(coords: np.ndarray, lodgings: list[dict]) -> list[int]:
-    """
-    Finds the route indices corresponding to the nearest lodging locations.
-
-    Args:
-        coords: Array of route coordinates [lon, lat].
-        lodgings: Ordered list of lodging dictionaries containing
-            'lon' and 'lat' coordinates.
-
-    Returns:
-        list[int]: Route indices corresponding to the lodging locations.
-    """
-    out, start = [], 0
-    for l in lodgings:
-        k = np.cos(np.radians(l["lat"]))
-        d = np.hypot((coords[start:, 0] - l["lon"]) * k, coords[start:, 1] - l["lat"])
-        j = int(d.argmin())
-        start += j
-        out.append(start)
-    return out
+def _route_pair(a, b) -> np.ndarray:
+    """One short brouter request."""
+    fc = brouter_parallel([list(a), list(b)])
+    coords = fc["features"][0]["geometry"]["coordinates"]
+    return np.array([[c[0], c[1], c[2] if len(c) > 2 else np.nan] for c in coords], dtype=float)
 
 def build_stage_matrix(lengths: np.ndarray, ups: np.ndarray, downs: np.ndarray, db_lodgings: list[dict], tmax: float,
                        beta: float, level: Literal["b", "i", "a"] = "i",):
@@ -72,13 +59,15 @@ def build_stage_matrix(lengths: np.ndarray, ups: np.ndarray, downs: np.ndarray, 
 
     mask = L[None, :] > L[:, None]
     T = np.full(dL.shape, np.inf)
+    tmin = 4
     T[mask] = t_din33466(dL[mask], dH_up[mask], dH_down[mask], level)
     T[T * (1.0 + beta) > tmax] = np.inf
+    T[T < tmin] = np.inf
     lod_idx = np.array([-1] + list(range(len(db_lodgings))) + [-1])[order]
 
-    return names, idx, T, dL, lod_idx
+    return names, idx, T, dL, lod_idx, detour
 
-def partition_dp(times: np.ndarray, t_target: float, n: int):
+def partition_dp(times: np.ndarray, t_target: float, n: int, node_pen=None):
     """
     Partitions a route into a specified number of stages using dynamic
     programming.
@@ -96,8 +85,10 @@ def partition_dp(times: np.ndarray, t_target: float, n: int):
         ValueError: If no valid partition exists for the specified number of stages.
     """
     m = times.shape[0]
-    cost = (times / t_target - 1) ** 2
-
+    cost = (times / t_target - 1) ** 2      # cost function
+    if node_pen is not None:
+        cost = cost + node_pen[None, :]     # penalty (karaK!)
+    #(disp?)
     best = np.full((n + 1, m), np.inf)
     best[0, 0] = 0.0
     prev = np.full((n + 1, m), -1, dtype=int)
@@ -140,93 +131,48 @@ def lodgings(path: dict[str, Any], db_lodgings: list[dict], waypoints: Sequence[
         ValueError: If the number of days is less than one or no valid
             route partition exists for the given parameters.
     """
-
     if n < 1:
         raise ValueError("Number of days must be greater at least one.")
 
-    route = np.asarray(path["features"][0]["geometry"]["coordinates"])
-    lengths, ups, downs, ele = calculate_route_profile(route)
+    route = np.asarray(path["features"][0]["geometry"]["coordinates"], dtype=float)
+    lengths, ups, downs, _ = calculate_route_profile(route)
 
-    dL = lengths[-1]
-    dH_up = ups[-1]
-    dH_down = downs[-1]
-
-    t_din = float(t_din33466(dL, dH_up, dH_down, level))
+    t_din = float(t_din33466(lengths[-1], ups[-1], downs[-1], level))
     t_target = t_din / n
 
-    names, idx, T, dL_mat, lod_idx = build_stage_matrix(lengths, ups, downs, db_lodgings, tmax, beta, level)
-    path, total_cost = partition_dp(T, t_target, n)
+    names, idx, T, dL_mat, lod_idx, detour = build_stage_matrix(lengths, ups, downs, db_lodgings, tmax, beta, level)
+    DETOUR_W = 0.1
+    node_pen = DETOUR_W * (detour / 1000.0) ** 2
+    bounds, total_cost = partition_dp(T, t_target, n, node_pen)
 
-    waypoints = np.asarray(waypoints, dtype=float)
-    waypoint_indices = set()
-    search_from = 0
-
-    for wp in waypoints[1:-1]:
-        k = np.cos(np.radians(wp[1]))
-        d = np.hypot(
-            (route[search_from:, 0] - wp[0]) * k,
-            route[search_from:, 1] - wp[1]
-        )
-
-        wp_idx = search_from + int(d.argmin())
-        waypoint_indices.add(wp_idx)
-        search_from = wp_idx
-
-    full_path = []
-    chosen_lodgings = []
-    sample_distance = 5000
-    sampled_indices = np.searchsorted(lengths,np.arange(0, lengths[-1], sample_distance))
-    sampled_indices = np.unique(np.append(sampled_indices, len(route) - 1))
-
-    for a, b in zip(path[:-1], path[1:]):
-        start_idx = idx[a]
-        end_idx = idx[b]
-
-        selected = set(sampled_indices[(sampled_indices > start_idx) & (sampled_indices < end_idx)].tolist())
-        selected.update([start_idx, end_idx])
-
-        selected.update(wp_idx for wp_idx in waypoint_indices if start_idx < wp_idx <= end_idx)
-
-        segment_indices = sorted(selected)
-        segment = route[segment_indices, :2].tolist()
-
-        if full_path and segment:
-            segment = segment[1:]
-
-        full_path.extend(segment)
-
+    stops, chosen_lodgings = [], []
+    for b in bounds[1:]:
         li = int(lod_idx[b])
         if li >= 0:
             lod = db_lodgings[li]
             chosen_lodgings.append(lod)
-            full_path.append([lod["lon"], lod["lat"]])
+            stops.append((int(idx[b]), [lod["lon"], lod["lat"]]))
 
-    full_route = brouter_parallel(full_path)
+    final, splits = build_with_spurs(route, lengths, stops, _route_pair, delta_m=1000.0, eps_m=20.0)
 
-    coords = full_route["features"][0]["geometry"]["coordinates"]
-    final = np.array([[c[0], c[1], c[2] if len(c) > 2 else np.nan] for c in coords], dtype=float)
     ele = final[:, 2]
-    mask = np.isnan(ele)
-    if mask.any():
-        good = np.flatnonzero(~mask)
-        if good.size == 0:
-            final[:, 2] = 0.0
-        else:
-            final[:, 2] = np.interp(np.arange(len(ele)), good, ele[good])
+    bad = np.isnan(ele)
+    if bad.any():
+        good = np.flatnonzero(~bad)
+        final[:, 2] = 0.0 if good.size == 0 else np.interp(np.arange(len(ele)), good, ele[good])
 
+    full_route = copy.deepcopy(path)
     full_route["features"][0]["geometry"]["coordinates"] = final.tolist()
-    splits = split_indices(final[:, :2], chosen_lodgings)
     gpx = create_gpx(full_route, splits, chosen_lodgings)
 
     f_lengths, f_ups, f_downs, _ = calculate_route_profile(final)
-
     dL = float(f_lengths[-1])
     dH_up = float(f_ups[-1])
     dH_down = float(f_downs[-1])
     t_din = float(t_din33466(dL, dH_up, dH_down, level))
 
-    stage_times = [float(T[a, b]) for a, b in zip(path[:-1], path[1:])]
-    stage_lengths = [float(dL_mat[a, b]) for a, b in zip(path[:-1], path[1:])]
+    stage_times = [float(T[a, b]) for a, b in zip(bounds[:-1], bounds[1:])]
+    stage_lengths = [float(dL_mat[a, b]) for a, b in zip(bounds[:-1], bounds[1:])]
 
     return {
         "dL": dL,
@@ -235,9 +181,9 @@ def lodgings(path: dict[str, Any], db_lodgings: list[dict], waypoints: Sequence[
         "approx_t": t_din,
         "target_time": t_target,
         "total_cost": total_cost,
-        "asc":  dH_up,
+        "asc": dH_up,
         "desc": dH_down,
         "path": full_route,
-        "gpx":  gpx,
+        "gpx": gpx,
         "lodgings": chosen_lodgings,
     }
