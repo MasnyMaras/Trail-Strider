@@ -16,7 +16,6 @@ class RouteRequest(BaseModel):
 class LodgingsRequest(BaseModel):
     path: dict[str, Any]                    # base BRouter path
     db_lodgings: list[dict]                 # list of lodgings from database
-    waypoints: list[tuple[float, float]]    # [[lon, lat], ...]
     n: int = Field(ge=1)                    # number of days to split the route
     tmax: float = Field(gt=0)               # max allowed time of one leg of the route in hours
     beta: float = Field(ge=0, le=0.5)       # safety margin, 0.15 < beta < 0.20
@@ -44,7 +43,7 @@ def route(req: RouteRequest):
 @app.post("/w_lodgings")
 def w_lodgings(req: LodgingsRequest):
     try:
-        return planner.lodgings(req.path, req.db_lodgings, req.waypoints, req.n, req.tmax, req.beta, req.level)
+        return planner.lodgings(req.path, req.db_lodgings, req.n, req.tmax, req.beta, req.level)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except requests.HTTPError as e:

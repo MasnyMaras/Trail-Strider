@@ -52,14 +52,13 @@ def get_route_FIXME(points, mode):
         raise HTTPException(status_code=502, detail="route service unavailable")
     return r.json()
 
-def get_lodgings(path, db_lodgings, waypoints, n, tmax, beta, level):
+def get_lodgings(path, db_lodgings, n, tmax, beta, level):
     try:
         r = requests.post(
             f"{ROUTING_URL}/w_lodgings",
             json={
                 "path": path,
                 "db_lodgings": db_lodgings,
-                "waypoints": waypoints,
                 "n": n,
                 "tmax": tmax,
                 "beta": beta,

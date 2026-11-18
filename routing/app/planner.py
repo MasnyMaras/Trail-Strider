@@ -1,6 +1,5 @@
 import numpy as np
 import copy
-from collections.abc import Sequence
 from typing import Any, Literal
 
 from app.routing import create_gpx, brouter_parallel
@@ -110,7 +109,7 @@ def partition_dp(times: np.ndarray, t_target: float, n: int, node_pen=None):
         path.append(j)
     return path[::-1], float(best[n, m - 1])
 
-def lodgings(path: dict[str, Any], db_lodgings: list[dict], waypoints: Sequence[Sequence[float]],
+def lodgings(path: dict[str, Any], db_lodgings: list[dict],
              n: int, tmax: float, beta: float, level: Literal["b", "i", "a"] = "i") -> dict[str, Any]:
     """
     Splits route to days, adjusts accommodation and generates route segments.

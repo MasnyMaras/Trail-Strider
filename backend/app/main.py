@@ -26,7 +26,6 @@ class RouteRequestFIXME(BaseModel):
 
 class PlanRequest(BaseModel):
     path: dict[str, Any]    # GeoJSON from /api/route
-    waypoints: list[tuple[float, float]]  # [[lon, lat], ...]
     n: int = Field(ge=1, le=30)    # number of days
     tmax: float = Field(gt=0)    # max time for one fragment [h]
     beta: float = Field(0.15, ge=0.0, le=0.5)  # safety margin
@@ -103,4 +102,4 @@ def plan_lodgings(req: PlanRequest):
         raise HTTPException(status_code=503, detail="lodgings unavailable: run db/sql/noclegi.sql")
 
     db_lodgings = json.loads(json.dumps(db_lodgings, default=float))
-    return get_lodgings(req.path, db_lodgings, req.waypoints, req.n, req.tmax, req.beta, req.level)
+    return get_lodgings(req.path, db_lodgings, req.n, req.tmax, req.beta, req.level)
