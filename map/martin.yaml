@@ -55,6 +55,16 @@ postgres:
         woda_odl_m: float4
         www: text
         telefon: text
+    miejsca:                   # ciekawe miejsca: szczyty, przełęcze, doliny itd. (db/sql/miejsca.sql)
+      schema: app
+      table: miejsca
+      srid: 3857
+      geometry_column: geom
+      id_column: id
+      properties:
+        rodzaj: text
+        nazwa: text
+        wysokosc: int4  
 
 # podkład: każdy plik *.mbtiles z folderu to osobne źródło (nazwa = nazwa pliku)
 mbtiles:

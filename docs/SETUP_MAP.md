@@ -8,6 +8,8 @@ Instrukcja ma dwie części:
   serwer kafli **Martin** (usługa `martin` w `compose.yaml`). Styl mapy, czcionki i ikonki są w repozytorium (`map/`).
 - **Część 3 (krok 32): szlaki turystyczne na mapie.**
 - **Część 4 (krok 33): noclegi na dziko w Maramureșu** – z modelu terenu Copernicus i danych OSM.
+- **Część 5 (krok 34): noclegi na mapie.**
+- **Część 6 (krok 35): ciekawe miejsca** – szczyty, przełęcze, doliny, punkty widokowe, wodospady, jaskinie.
 
 Dokładny opis działania jest na końcu („Jak to działa”).
 
@@ -1561,6 +1563,66 @@ curl -s localhost:3000/noclegi | grep -o '"attribution"'
 
 ---
 
+# CZĘŚĆ 6. Ciekawe miejsca (krok 35)
+
+Dodane 19.11.2026. Tabela `app.miejsca` – szczyty, przełęcze, doliny, punkty widokowe, wodospady i jaskinie z OSM,
+jako punkty, tylko w trzech regionach. Martin podaje ją jako źródło `miejsca` (do mapy); z tej samej tabeli może
+korzystać wyszukiwanie po nazwie.
+
+**Co musi być spełnione:** krok 22 (trzy regiony w bazie). Jeśli przeszedłeś wcześniejsze kroki: najpierw `git pull`
+(baza i Martin mogą działać).
+
+
+---
+
+## Krok 35. Ciekawe miejsca
+
+**Wykonaj:**
+```bash
+docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/miejsca.sql
+docker compose restart martin
+```
+Skrypt bierze obiekty z `points`, `lines` i `polygons` i zamienia je na punkty (linia – jej środek, obszar – punkt
+wewnątrz), wysokość bierze z tagu `ele`, a na końcu usuwa miejsca spoza regionów. Martin czyta nowe źródło tylko
+przy starcie.
+
+| rodzaj | tag OSM |
+|---|---|
+| `szczyt` | `natural=peak` |
+| `przelecz` | `natural=saddle` lub `mountain_pass=yes` |
+| `dolina` | `natural=valley` |
+| `punkt_widokowy` | `tourism=viewpoint` |
+| `wodospad` | `waterway=waterfall` |
+| `jaskinia` | `natural=cave_entrance` |
+
+**Wymagane (wynik skryptu):**
+| co | musi pokazać |
+|---|---|
+| `INSERT` / `DELETE` | `INSERT 0 6740`, `SELECT 3`, `DELETE 568` (miejsca spoza regionów) |
+| podsumowanie | `szczyt 3734` (z nazwą `3008`, z wysokością `3497`), `punkt_widokowy 1084`, `jaskinia 601`, `przelecz 391`, `dolina 248`, `wodospad 114` – razem 6172 |
+| ostatnia linia | `COMMIT` |
+
+**Sprawdź po** (po ok. 30 s):
+```bash
+docker compose logs martin --tail 25 | grep -E "WARN|ERROR"
+curl -s localhost:3000/catalog | python3 -c "import json,sys; print(sorted(json.load(sys.stdin)['tiles']))"
+curl -s localhost:3000/miejsca | grep -o '"fields":{[^}]*}'
+curl -s -o /dev/null -w "%{http_code}  %{size_download} B\n" http://localhost:3000/miejsca/11/1137/701
+```
+
+**Wymagane:**
+| co | musi pokazać |
+|---|---|
+| logi Martina | nic |
+| katalog | `['malopolskie', 'map_mask', 'map_regions', 'maramures', 'miejsca', 'noclegi', 'pomorskie', 'trail_segments', 'trails']` |
+| pola | `"fields":{"nazwa":"text","rodzaj":"text","wysokosc":"int4"}` |
+| kafel z Tatrami | `200  31216 B` |
+
+✅ **Gotowe.**
+
+
+---
+
 ## Codzienna praca
 
 ```bash
@@ -1657,6 +1719,7 @@ styles/liberty.json, fonts/*.ttf, sprites/ofm/*.svg ─────────�
 | `db/sql/trails.sql` | szlaki: tabele `app.trails` i `app.trail_segments` (krok 32) |
 | `utils/slope_map.py` | mapa nachylenia z Copernicus GLO-30 (krok 33b) |
 | `db/scripts/dziko_punkty.py` | noclegi na dziko w Maramureșu: tabela `app.dziko_punkty` (krok 33c) |
+| `db/sql/miejsca.sql` | ciekawe miejsca: tabela `app.miejsca` (krok 35) |
 | `frontend/src/components/map/Regions.ts` | lista regionów i adres Martina |
 | `frontend/src/components/map/MapView.tsx`, `frontend/src/App.tsx` | wyświetlanie regionu i ograniczenie widoku (zmiany oznaczone komentarzem `[mapa-regiony]`) |
 
