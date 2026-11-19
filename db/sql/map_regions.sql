@@ -1,12 +1,9 @@
--- Obrysy regionów mapy i maska (przyciemnienie poza regionami) dla serwera kafli Martin.
--- Uruchamiać z głównego folderu repozytorium, po imporcie OSM:
---   docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/map_regions.sql
 
 BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS app;
 
--- obrysy regionów: obszar złożony z linii granic (tabela boundaries z osm2pgsql)
+-- obrysy regionów
 DROP TABLE IF EXISTS app.map_regions;
 CREATE TABLE app.map_regions AS
 SELECT relation_id AS id,
@@ -16,7 +13,7 @@ FROM boundaries
 WHERE tags->>'admin_level' = '4'
   AND tags->>'name' IN ('województwo małopolskie', 'województwo pomorskie', 'Maramureș');
 
--- maska: cały świat (granice układu EPSG:3857) bez regionów
+-- maska
 DROP TABLE IF EXISTS app.map_mask;
 CREATE TABLE app.map_mask AS
 SELECT ST_Multi(ST_Difference(
@@ -27,7 +24,7 @@ FROM app.map_regions;
 CREATE INDEX ON app.map_regions USING gist (geom);
 CREATE INDEX ON app.map_mask USING gist (geom);
 
--- kontrola: powierzchnie regionów i kształt maski
+-- kontrola
 SELECT id, name, round(ST_Area(ST_Transform(geom, 4326)::geography) / 1e6) AS km2
 FROM app.map_regions ORDER BY id;
 SELECT ST_NumGeometries(geom) AS parts, ST_NumInteriorRings(ST_GeometryN(geom, 1)) AS holes

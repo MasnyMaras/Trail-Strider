@@ -1,9 +1,4 @@
 
--- Punkty noclegowe w obszarach „Zanocuj w lesie" (bdl.zanocuj_punkty), opis: docs/SETUP.md, Krok 14.
--- Uruchamiać z głównego folderu repozytorium:
---   docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/zanocuj_punkty.sql
--- Żeby dodać woj. Pomorskie: docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 \ -v "wojewodztwo=województwo pomorskie" -f - < db/sql/zanocuj_punkty.sql
-
 \if :{?wojewodztwo}
 \else
 \set wojewodztwo 'województwo małopolskie'
@@ -50,7 +45,7 @@ SELECT o.obszar_id, g.i, g.j, ST_Intersection(g.geom, o.geom_m) AS geom
 FROM t_obszary o, ST_SquareGrid(:bok_m, o.geom_m) g
 WHERE ST_Intersects(g.geom, o.geom_m);
 
--- Punkt w komórce: miejsce na ścieżce najbliższe środka komórki
+--miejsce na ścieżce najbliższe środka komórki
 CREATE TEMP TABLE t_punkty ON COMMIT DROP AS
 SELECT k.obszar_id, ST_ClosestPoint(s.geom, ST_PointOnSurface(k.geom)) AS geom_m,
        true AS przy_sciezce
@@ -62,7 +57,7 @@ CROSS JOIN LATERAL (
 ) s
 WHERE s.geom IS NOT NULL AND NOT ST_IsEmpty(s.geom);
 
--- Obszar bez ścieżek: jeden punkt w środku
+-- Obszar bez ścieżek
 INSERT INTO t_punkty (obszar_id, geom_m, przy_sciezce)
 SELECT o.obszar_id, ST_PointOnSurface(o.geom_m), false
 FROM t_obszary o
@@ -103,7 +98,7 @@ CREATE TABLE IF NOT EXISTS bdl.zanocuj_punkty (
 );
 CREATE INDEX IF NOT EXISTS zanocuj_punkty_geom_idx ON bdl.zanocuj_punkty USING gist (geom);
 COMMENT ON TABLE bdl.zanocuj_punkty IS
-    'Punkty noclegowe wyznaczone z bdl.zanocuj_w_lesie (db/sql/zanocuj_punkty.sql): siatka 5 km², punkty na ścieżkach, woda z OSM';
+    'Punkty noclegowe wyznaczone z bdl.zanocuj_w_lesie (db/sql/zanocuj_punkty.sql): siatka 5 km^2, punkty na ścieżkach, woda z OSM';
 
 DELETE FROM bdl.zanocuj_punkty WHERE wojewodztwo = :'wojewodztwo';
 

@@ -1,8 +1,3 @@
--- Wspólna tabela noclegów dla backendu (app.noclegi): OSM + Lasy Państwowe + punkty „Zanocuj w lesie".
--- Uruchamiać z głównego folderu repozytorium (po db/sql/zanocuj_punkty.sql):
---   docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/noclegi.sql
--- Tabela jest budowana od nowa przy każdym uruchomieniu (po imporcie OSM, bdl_load.py lub zanocuj_punkty.sql).
-
 \timing on
 
 BEGIN;
@@ -76,7 +71,7 @@ WHERE o.zrodlo = 'osm' AND l.zrodlo = 'lp'
 INSERT INTO app.noclegi (zrodlo, zrodlo_id, rodzaj, nazwa, super, woda_rodzaj, woda_odl_m, geom)
 SELECT 'zanocuj', id::text, 'zanocuj_w_lesie', NULL, super, woda_rodzaj, woda_odl_m, geom
 FROM bdl.zanocuj_punkty;
--- nocleg na dziko (Maramureș, db/scripts/dziko_punkty.py); bez tego skryptu tabela jest pusta
+-- nocleg na dziko
 CREATE TABLE IF NOT EXISTS app.dziko_punkty (id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     woda_odl_m real NOT NULL, geom geometry(Point, 3857) NOT NULL);
 INSERT INTO app.noclegi (zrodlo, zrodlo_id, rodzaj, super, woda_odl_m, geom)
@@ -93,10 +88,6 @@ WHERE NOT EXISTS (SELECT 1 FROM t_regiony r WHERE ST_Intersects(n.geom, r.geom))
 
 CREATE INDEX noclegi_geom_idx ON app.noclegi USING gist (geom);
 ANALYZE app.noclegi;
---COMMENT ON TABLE app.noclegi IS
---    'Noclegi dla backendu: OSM (© OpenStreetMap contributors), Lasy Państwowe (BDL), bdl.zanocuj_punkty; db/sql/noclegi.sql';
-
--- komentarz w formacie JSON: Martin dołącza go do opisu źródła (TileJSON); "attribution" pokazuje się w ⓘ na mapie
 COMMENT ON TABLE app.noclegi IS
     '{"description": "Noclegi: OSM, Lasy Państwowe (BDL), Zanocuj w lesie, nocleg na dziko (Maramureș); db/sql/noclegi.sql",
       "attribution": "© OpenStreetMap contributors, © Lasy Państwowe (BDL), Copernicus DEM GLO-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA"}';
