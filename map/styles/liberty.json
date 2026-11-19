@@ -20,11 +20,16 @@
     "noclegi": {
       "type": "vector",
       "url": "http://localhost:3000/noclegi"
+    },
+    "miejsca": {
+      "type": "vector",
+      "url": "http://localhost:3000/miejsca"
     }
   },
   "sprite": [
     {"id": "default", "url": "http://localhost:3000/sprite/ofm"},
-    {"id": "noclegi", "url": "http://localhost:3000/sprite/noclegi"}
+    {"id": "noclegi", "url": "http://localhost:3000/sprite/noclegi"},
+    {"id": "miejsca", "url": "http://localhost:3000/sprite/miejsca"}
   ],
   "glyphs": "http://localhost:3000/font/{fontstack}/{range}",
   "layers": [
@@ -4431,7 +4436,8 @@
           ],
           20
         ],
-        ["match", ["get", "class"], ["lodging", "campsite"], false, true]
+        ["match", ["get", "class"], ["lodging", "campsite"], false, true],
+        ["match", ["get", "subclass"], ["viewpoint"], false, true]
       ],
       "layout": {
         "icon-image": [
@@ -4537,7 +4543,8 @@
           ],
           20
         ],
-        ["match", ["get", "class"], ["lodging", "campsite"], false, true]
+        ["match", ["get", "class"], ["lodging", "campsite"], false, true],
+        ["match", ["get", "subclass"], ["viewpoint"], false, true]
       ],
       "layout": {
         "icon-image": [
@@ -4643,7 +4650,8 @@
           ],
           7
         ],
-        ["match", ["get", "class"], ["lodging", "campsite"], false, true]
+        ["match", ["get", "class"], ["lodging", "campsite"], false, true],
+        ["match", ["get", "subclass"], ["viewpoint"], false, true]
       ],
       "layout": {
         "icon-image": [
@@ -5346,6 +5354,36 @@
           ["pole_namiotowe", "miejsce_biwakowe"], "campsite",
           "lodging"],
         "text-field": ["step", ["zoom"], "", 15, ["coalesce", ["get", "nazwa"], ""]],
+        "text-font": ["Noto Sans Italic"],
+        "text-size": 12,
+        "text-anchor": "top",
+        "text-offset": [0, 0.6],
+        "text-max-width": 9,
+        "text-optional": true
+      },
+      "paint": {
+        "text-color": "#666",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1,
+        "text-halo-blur": 0.5
+      }
+    },
+    {
+      "id": "miejsca",
+      "type": "symbol",
+      "source": "miejsca",
+      "source-layer": "miejsca",
+      "minzoom": 12,
+      "layout": {
+        "icon-image": ["match", ["get", "rodzaj"], "szczyt", "mountain", ["concat", "miejsca:", ["get", "rodzaj"]]],
+        "symbol-sort-key": ["-", 0, ["coalesce", ["get", "wysokosc"], 0]],
+        "text-field": ["let",
+          "peak", ["concat", ["coalesce", ["get", "nazwa"], ""],
+            ["case", ["has", "wysokosc"], ["concat", ["case", ["has", "nazwa"], "\n", ""], ["to-string", ["get", "wysokosc"]], " m"], ""]],
+          "name", ["coalesce", ["get", "nazwa"], ""],
+          ["step", ["zoom"], "",
+            13, ["case", ["==", ["get", "rodzaj"], "szczyt"], ["var", "peak"], ""],
+            15, ["case", ["==", ["get", "rodzaj"], "szczyt"], ["var", "peak"], ["var", "name"]]]],
         "text-font": ["Noto Sans Italic"],
         "text-size": 12,
         "text-anchor": "top",

@@ -83,6 +83,7 @@ sprites:
   paths:
     - /map/sprites/ofm         # nazwa zestawu ikon = nazwa folderu (ofm)
     - /map/sprites/noclegi     # własne ikony noclegów (np. campsite_wild – „Zanocuj w lesie” i dziko)
+    - /map/sprites/miejsca     # ikony ciekawych miejsc (rysunki z Maki i Temaki, CC0)
 
 styles:
   paths:
