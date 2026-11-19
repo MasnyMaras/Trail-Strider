@@ -1623,6 +1623,31 @@ curl -s -o /dev/null -w "%{http_code}  %{size_download} B\n" http://localhost:30
 
 ---
 
+# CZĘŚĆ 7. Wyszukiwanie nazw (krok 36)
+
+Wyszukiwarka działa na lokalnej bazie OSM i tabelach aplikacji — nie korzysta z zewnętrznego geokodera. Szuka nazw
+obiektów OSM oraz nazwanych ciekawych miejsc, noclegów i szlaków w Małopolsce, na Pomorzu i w Maramureșu.
+Uwzględnia miejscowości (`city`, `town`, `village`, `hamlet` i podobne), polskie i rumuńskie znaki diakrytyczne
+oraz proste literówki.
+
+**Co musi być spełnione:** wykonane kroki 32, 34 i 35, aby istniały tabele `app.trails`, `app.noclegi` i
+`app.miejsca`.
+
+**Wykonaj po utworzeniu lub ponownym przebudowaniu tych tabel:**
+```bash
+docker compose exec -T db psql -U osm -d osm -v ON_ERROR_STOP=1 -f - < db/sql/search_places.sql
+```
+Skrypt włącza rozszerzenie PostgreSQL `pg_trgm` i tworzy indeksy, które przyspieszają podpowiedzi oraz dopasowanie
+literówek. Pierwsze utworzenie indeksów może chwilę potrwać. Nie trzeba restartować Martina; backend ładuje nowy
+endpoint automatycznie.
+
+Po uruchomieniu aplikacji wpisz co najmniej dwa znaki w wyszukiwarkę i wybierz wynik, aby przejść do miejsca na mapie.
+
+✅ **Gotowe.**
+
+
+---
+
 ## Codzienna praca
 
 ```bash
@@ -1720,6 +1745,8 @@ styles/liberty.json, fonts/*.ttf, sprites/ofm/*.svg ─────────�
 | `utils/slope_map.py` | mapa nachylenia z Copernicus GLO-30 (krok 33b) |
 | `db/scripts/dziko_punkty.py` | noclegi na dziko w Maramureșu: tabela `app.dziko_punkty` (krok 33c) |
 | `db/sql/miejsca.sql` | ciekawe miejsca: tabela `app.miejsca` (krok 35) |
+| `db/sql/search_places.sql` | indeksy wyszukiwania nazw OSM (krok 36) |
+| `backend/app/places.py` | lokalne wyszukiwanie nazw, miejscowości i literówek |
 | `frontend/src/components/map/Regions.ts` | lista regionów i adres Martina |
 | `frontend/src/components/map/MapView.tsx`, `frontend/src/App.tsx` | wyświetlanie regionu i ograniczenie widoku (zmiany oznaczone komentarzem `[mapa-regiony]`) |
 

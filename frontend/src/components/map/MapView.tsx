@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 // import { Map, NavigationControl, setWorkerUrl, Popup, Marker } from "maplibre-gl"    // SEBKUC
 import { Map, NavigationControl, setWorkerUrl, Popup, Marker, type GeoJSONSource } from "maplibre-gl" // SEBKUC [mapa-regiony]
 import "maplibre-gl/dist/maplibre-gl.css"
@@ -6,6 +6,7 @@ import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import { ScaleControl } from "./Scale"
 import { MARTIN_URL, REGIONS, type RegionId } from "./Regions" // SEBKUC [mapa-regiony]
 import type { Coordinates, RoutePoint, RouteGeoJson, SinglePointRole } from "@/types/route"
+import type { PlaceSearchResult } from "@/api/places"
 
 const REGION_SOURCE_NAMES: Record<RegionId, string> = {
     malopolskie: "województwo małopolskie",
@@ -23,6 +24,7 @@ interface MapViewProps {
     isAutoMode: boolean
     automaticWaypoints?: Coordinates[]
     points: RoutePoint[]
+    selectedPlace: PlaceSearchResult | null
     onAddPoint: (coords: [number, number], mode: "start" | "end" | "middle") => void
     onRemovePoint: (id: string) => void
     routeGeoJson?: RouteGeoJson
@@ -40,14 +42,17 @@ interface MapViewProps {
 //     }, [points])
 
 // SEBKUC
-export function MapView({ isSidebarOpen, regionId, onRegionChange, isRouteLoading, singlePointRole, isAutoMode, automaticWaypoints, points, onAddPoint, onRemovePoint, routeGeoJson }: MapViewProps) { // [mapa-regiony]
+export function MapView({ isSidebarOpen, regionId, onRegionChange, isRouteLoading, singlePointRole, isAutoMode, automaticWaypoints, points, selectedPlace, onAddPoint, onRemovePoint, routeGeoJson }: MapViewProps) { // [mapa-regiony]
     const mapContainerRef = useRef<HTMLDivElement>(null)
     const mapRef = useRef<Map | null>(null)
     const regionRequestRef = useRef(0)
     const regionMoveEndRef = useRef<(() => void) | null>(null)
     const regionIdRef = useRef(regionId)
+    const regionReadyRef = useRef(false)
+    const selectedPlaceRef = useRef(selectedPlace)
     const singlePointRoleRef = useRef(singlePointRole)
     const activeMarkersRef = useRef<Marker[]>([])
+    const searchMarkerRef = useRef<Marker | null>(null)
     const tempMarkerRef = useRef<Marker | null>(null)
     const pointsRef = useRef(points)
     useEffect(() => {
@@ -59,6 +64,45 @@ export function MapView({ isSidebarOpen, regionId, onRegionChange, isRouteLoadin
     useEffect(() => {
         singlePointRoleRef.current = singlePointRole
     }, [singlePointRole])
+
+    const focusSearchPlace = useCallback((place: PlaceSearchResult) => {
+        const map = mapRef.current
+        if (!map || !regionReadyRef.current || place.region_id !== regionIdRef.current) return
+
+        searchMarkerRef.current?.remove()
+        const popupContent = document.createElement("div")
+        popupContent.className = "p-1"
+        const name = document.createElement("p")
+        name.className = "text-xs font-bold text-slate-800"
+        name.textContent = place.name
+        const details = document.createElement("p")
+        details.className = "text-[10px] text-slate-500"
+        details.textContent = `${place.category.replaceAll("_", " ")} · ${place.region}`
+        popupContent.append(name, details)
+
+        const popup = new Popup({ offset: 15, closeButton: false }).setDOMContent(popupContent)
+        searchMarkerRef.current = new Marker({ color: "#15803d" })
+            .setLngLat([place.longitude, place.latitude])
+            .setPopup(popup)
+            .addTo(map)
+        searchMarkerRef.current.togglePopup()
+        map.flyTo({
+            center: [place.longitude, place.latitude],
+            zoom: Math.max(map.getZoom(), 14),
+        })
+    }, [])
+
+    useEffect(() => {
+        selectedPlaceRef.current = selectedPlace
+        if (!selectedPlace) {
+            searchMarkerRef.current?.remove()
+            searchMarkerRef.current = null
+            return
+        }
+        if (regionReadyRef.current && selectedPlace.region_id === regionIdRef.current) {
+            focusSearchPlace(selectedPlace)
+        }
+    }, [selectedPlace, focusSearchPlace])
 // END SEBKUC
 
     useEffect(() => {
@@ -184,6 +228,8 @@ export function MapView({ isSidebarOpen, regionId, onRegionChange, isRouteLoadin
         mapRef.current = map
 
         return () => {
+            searchMarkerRef.current?.remove()
+            searchMarkerRef.current = null
             map.remove()
             mapRef.current = null
         }
@@ -198,6 +244,7 @@ export function MapView({ isSidebarOpen, regionId, onRegionChange, isRouteLoadin
         const url = `${MARTIN_URL}/${regionId}`
         const abortController = new AbortController()
 
+        regionReadyRef.current = false
         map.setMaxBounds(null)
         if (regionMoveEndRef.current) {
             map.off("moveend", regionMoveEndRef.current)
@@ -250,6 +297,9 @@ export function MapView({ isSidebarOpen, regionId, onRegionChange, isRouteLoadin
                     const handleMoveEnd = () => {
                         if (requestId === regionRequestRef.current) {
                             map.setMaxBounds(map.getBounds())
+                            regionReadyRef.current = true
+                            const place = selectedPlaceRef.current
+                            if (place?.region_id === regionId) focusSearchPlace(place)
                         }
                         regionMoveEndRef.current = null
                     }
@@ -276,7 +326,7 @@ export function MapView({ isSidebarOpen, regionId, onRegionChange, isRouteLoadin
             map.stop()
             abortController.abort()
         }
-    }, [regionId])
+    }, [regionId, focusSearchPlace])
     // END SEBKUC
 
     useEffect(() => {

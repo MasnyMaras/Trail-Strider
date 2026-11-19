@@ -2,13 +2,14 @@ from typing import Literal, Any
 import json
 import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from app.db import engine
 from app.lodgings import lodgings_near_route
+from app.places import search_places as search_places_in_database
 from app.routing_client import get_route, get_route_FIXME, get_lodgings
 
 
@@ -46,6 +47,24 @@ def health_db():
     except OperationalError:
         raise HTTPException(status_code=503, detail="database unavailable")
     return {"db": "ok", "postgis": postgis}
+
+
+@app.get("/api/places/search")
+def search_places(q: str = Query(min_length=2, max_length=100)):
+    query = q.strip()
+    if len(query) < 2:
+        raise HTTPException(status_code=422, detail="Wpisz co najmniej 2 znaki.")
+    try:
+        return search_places_in_database(query)
+    except OperationalError:
+        raise HTTPException(status_code=503, detail="database unavailable")
+    except ProgrammingError:
+        logger.exception("place search is not initialized")
+        raise HTTPException(
+            status_code=503,
+            detail="Wyszukiwanie nie jest skonfigurowane. Uruchom db/sql/search_places.sql "
+                   "oraz skrypty tworzące dane miejsc, noclegów i szlaków.",
+        )
 
 
 @app.post("/api/route")

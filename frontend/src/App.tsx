@@ -6,9 +6,10 @@ import Sidebar from "@/components/ui/sidebar"
 import TrailPreferences from "@/components/ui/trail_preferences"
 import SaveRoute from "@/components/ui/save_route"
 import NotFound from "@/components/ui/not_found"
-//import SearchBar from "@/components/ui/search_bar";
+import SearchBar from "@/components/ui/search_bar"
 import ElevationProfile from "@/components/ui/elevation_profile.tsx";
 import type { RegionId } from "@/components/map/Regions"
+import type { PlaceSearchResult } from "@/api/places"
 import { calculateRoute } from "@/api/routes"
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { RoutePoint, RouteResponse, SinglePointRole } from "@/types/route"
@@ -109,6 +110,7 @@ export function App() {
     const [routeError, setRouteError] = useState<string | null>(null)
     const [isRouteLoading, setIsRouteLoading] = useState(false)
     const [regionId, setRegionId] = useState<RegionId>("malopolskie")
+    const [selectedPlace, setSelectedPlace] = useState<PlaceSearchResult | null>(null)
     const [singlePointRole, setSinglePointRole] = useState<SinglePointRole>(null)
     const routeRequestRef = useRef<AbortController | null>(null)
     const segmentCacheRef = useRef(new Map<string, CachedSegment>())
@@ -172,6 +174,7 @@ export function App() {
         if (nextRegionId === regionId) return
 
         setRegionId(nextRegionId)
+        setSelectedPlace(null)
         setSinglePointRole(null)
         setPoints([
             { id: "start-initial", value: "" },
@@ -181,6 +184,11 @@ export function App() {
         setRouteError(null)
         setRouteStats(null)
         segmentCacheRef.current.clear()
+    }
+
+    const handlePlaceSelect = (place: PlaceSearchResult) => {
+        if (place.region_id !== regionId) handleRegionChange(place.region_id)
+        setSelectedPlace(place)
     }
 
     const handleUpdatePointValue = (id: string, newValue: string) => {
@@ -421,11 +429,15 @@ export function App() {
                     <NotFound onGoHome={handleGoHome} />
                 ) : (
                     <>
-                        {/*<SearchBar isSidebarOpen={isSidebarOpen} />*/}
+                        <SearchBar
+                            isSidebarOpen={isSidebarOpen}
+                            onSelectPlace={handlePlaceSelect}
+                        />
                         <MapView
                             isSidebarOpen={isSidebarOpen}
                             regionId={regionId}
                             onRegionChange={handleRegionChange}
+                            selectedPlace={selectedPlace}
                             isRouteLoading={isRouteLoading}
                             singlePointRole={singlePointRole}
                             isAutoMode={isAutoMode}
